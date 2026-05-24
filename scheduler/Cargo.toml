@@ -1,0 +1,14 @@
+[package]
+name = "scheduler"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde.workspace = true
+tracing.workspace = true
+resource_manager = { path = "../resource_manager" }
+reputation_engine = { path = "../reputation_engine" }
+
+[dev-dependencies]
+serde_json.workspace = true
+chrono.workspace = true

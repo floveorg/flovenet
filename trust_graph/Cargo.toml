@@ -1,0 +1,11 @@
+[package]
+name = "trust_graph"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde.workspace = true
+chrono.workspace = true
+crypto = { path = "../crypto" }
+reputation_engine = { path = "../reputation_engine" }
+tracing.workspace = true

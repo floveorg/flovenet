@@ -1,0 +1,34 @@
+[package]
+name = "daemon"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+clap.workspace = true
+axum.workspace = true
+prometheus.workspace = true
+tower-http.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+futures.workspace = true
+libp2p.workspace = true
+uuid.workspace = true
+cli = { path = "../cli" }
+resource_manager = { path = "../resource_manager" }
+vm_runtime = { path = "../vm_runtime" }
+market_protocol = { path = "../market_protocol" }
+reputation_engine = { path = "../reputation_engine" }
+ipfs_layer = { path = "../ipfs_layer" }
+storage = { path = "../storage" }
+crypto = { path = "../crypto" }
+identity = { path = "../identity" }
+scheduler = { path = "../scheduler" }
+trust_graph = { path = "../trust_graph" }
+social_protocol = { path = "../social_protocol" }
+graphql_api = { path = "../graphql_api" }
+p2p_cache = { path = "../p2p_cache" }
+chrono.workspace = true

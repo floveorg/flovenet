@@ -1,0 +1,15 @@
+[package]
+name = "ipfs_layer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+async-trait.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+cid.workspace = true
+chrono.workspace = true
+tracing.workspace = true
+attohttpc = "0.24"
+storage = { path = "../storage" }
+tokio.workspace = true

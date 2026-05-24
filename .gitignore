@@ -1,0 +1,14 @@
+/target
+**/*.rs.bk
+*.swp
+*.swo
+*~
+.DS_Store
+.vscode
+.idea
+*.wasm
+wasm_images/*/target
+.env
+swarm.key
+pins.json
+flovenet-data/

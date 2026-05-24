@@ -1,0 +1,52 @@
+services:
+  node1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: daemon --port 9091 --api-port 9091 --roles compute,storage
+    ports:
+      - "9091:9091"
+    environment:
+      - RUST_LOG=info
+    networks:
+      - flovenet
+
+  node2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: daemon --port 9092 --api-port 9092 --roles compute
+    ports:
+      - "9092:9092"
+    environment:
+      - RUST_LOG=info
+    networks:
+      - flovenet
+
+  node3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: daemon --port 9093 --api-port 9093 --roles storage
+    ports:
+      - "9093:9093"
+    environment:
+      - RUST_LOG=info
+    networks:
+      - flovenet
+
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: api-gateway --port 8080
+    ports:
+      - "8080:8080"
+    environment:
+      - RUST_LOG=info
+    networks:
+      - flovenet
+
+networks:
+  flovenet:
+    driver: bridge

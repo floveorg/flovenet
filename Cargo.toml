@@ -1,0 +1,55 @@
+[workspace]
+resolver = "2"
+exclude = ["wasm_images/feed_ranker", "wasm_images/moderator"]
+members = [
+    "daemon",
+    "resource_manager",
+    "vm_runtime",
+        "market_protocol",
+        "p2p_cache",
+        "reputation_engine",
+    "ipfs_layer",
+    "storage",
+    "crypto",
+    "identity",
+    "scheduler",
+    "trust_graph",
+    "social_protocol",
+    "graphql_api",
+    "cli",
+]
+
+[workspace.dependencies]
+anyhow = "1"
+async-trait = "0.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tokio = { version = "1", features = ["full"] }
+thiserror = "2"
+cid = { version = "0.11", features = ["serde"] }
+libp2p = { version = "0.54", features = ["kad", "gossipsub", "identify", "ping", "noise", "yamux", "tcp", "dns", "tokio", "macros", "request-response", "json"] }
+clap = { version = "4", features = ["derive"] }
+proptest = "1"
+chrono = { version = "0.4", features = ["serde"] }
+axum = { version = "0.7", features = ["ws"] }
+prometheus = { version = "0.13", features = ["process"] }
+tower-http = { version = "0.5", features = ["cors"] }
+hyper = { version = "1", features = ["full"] }
+sysinfo = "0.31"
+futures = "0.3"
+uuid = { version = "1", features = ["v4"] }
+multihash = "0.19"
+sha2 = "0.10"
+hex = "0.4"
+wasmtime = "24"
+wasmtime-wasi = "24"
+ed25519-dalek = { version = "2", features = ["serde", "pem"] }
+chacha20poly1305 = "0.10"
+argon2 = "0.5"
+rand = "0.8"
+zeroize = { version = "1", features = ["derive"] }
+base64 = "0.22"
+async-graphql = { version = "7", features = ["chrono", "playground", "tracing"] }
+jsonwebtoken = "9"

@@ -1,0 +1,12 @@
+[package]
+name = "p2p_cache"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+libp2p.workspace = true
+tokio.workspace = true
+storage = { path = "../storage" }
