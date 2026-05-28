@@ -13,8 +13,8 @@ use market_protocol::{JobBehaviour, JobOffer, JobResponse};
 use p2p_cache::{BlockCache, BlockRequest, BlockResponse};
 use reputation_engine::{EventKind, ReputationEvent, ReputationState};
 use tokio::sync::{Mutex, RwLock};
-use trust_graph::TrustGraph;
 use tracing::{info, trace, warn};
+use trust_graph::TrustGraph;
 
 use super::gossip;
 use super::HEARTBEAT_INTERVAL_SECS;
@@ -77,7 +77,11 @@ fn build_transport(
 impl NodeNetwork {
     /// Create and start a new network node
     /// `swarm_key` is an optional 32-byte PSK for private sub-network access.
-    pub fn new(port: u16, keypair: Option<identity::Keypair>, swarm_key: Option<[u8; 32]>) -> Result<Self> {
+    pub fn new(
+        port: u16,
+        keypair: Option<identity::Keypair>,
+        swarm_key: Option<[u8; 32]>,
+    ) -> Result<Self> {
         let keypair = keypair.unwrap_or_else(identity::Keypair::generate_ed25519);
         let peer_id = PeerId::from(keypair.public());
 
@@ -263,12 +267,21 @@ impl NodeNetwork {
                                 },
                             }
                         };
-                        let _ = self.swarm.behaviour_mut().job_market.send_response(channel, response);
+                        let _ = self
+                            .swarm
+                            .behaviour_mut()
+                            .job_market
+                            .send_response(channel, response);
                     }
                     Message::Response {
-                        request_id, response, ..
+                        request_id,
+                        response,
+                        ..
                     } => {
-                        info!("Job response for {}: accepted={}", request_id, response.accepted);
+                        info!(
+                            "Job response for {}: accepted={}",
+                            request_id, response.accepted
+                        );
                         // Hito 0.3 — requester rates the PROVIDER. The
                         // `peer` of the outer event is the responder. The
                         // event is unsigned today (Hito 6.1 will add a
@@ -301,19 +314,28 @@ impl NodeNetwork {
         }
     }
 
-    async fn handle_block_cache_event(&mut self, event: request_response::Event<BlockRequest, BlockResponse>) {
+    async fn handle_block_cache_event(
+        &mut self,
+        event: request_response::Event<BlockRequest, BlockResponse>,
+    ) {
         match event {
-            request_response::Event::Message { peer: _, message, .. } => {
-                match message {
-                    Message::Request { request, channel, .. } => {
-                        let resp = self.block_cache.handle_request(&request).await;
-                        let _ = self.swarm.behaviour_mut().block_cache.send_response(channel, resp);
-                    }
-                    Message::Response { response, .. } => {
-                        self.block_cache.handle_response(&response).await;
-                    }
+            request_response::Event::Message {
+                peer: _, message, ..
+            } => match message {
+                Message::Request {
+                    request, channel, ..
+                } => {
+                    let resp = self.block_cache.handle_request(&request).await;
+                    let _ = self
+                        .swarm
+                        .behaviour_mut()
+                        .block_cache
+                        .send_response(channel, resp);
                 }
-            }
+                Message::Response { response, .. } => {
+                    self.block_cache.handle_response(&response).await;
+                }
+            },
             request_response::Event::OutboundFailure { peer, error, .. } => {
                 tracing::warn!("Block cache outbound failure to {peer}: {error:?}");
             }
@@ -329,17 +351,29 @@ impl NodeNetwork {
     /// Request a block from a specific peer.
     #[allow(dead_code)]
     pub async fn request_block(&mut self, peer: PeerId, cid: &str) {
-        let req = BlockRequest { cid: cid.to_string() };
-        self.swarm.behaviour_mut().block_cache.send_request(&peer, req);
+        let req = BlockRequest {
+            cid: cid.to_string(),
+        };
+        self.swarm
+            .behaviour_mut()
+            .block_cache
+            .send_request(&peer, req);
     }
 
     #[allow(dead_code)]
     pub async fn send_job_offer(&mut self, peer: PeerId, offer: JobOffer) {
-        self.swarm.behaviour_mut().job_market.send_request(&peer, offer);
+        self.swarm
+            .behaviour_mut()
+            .job_market
+            .send_request(&peer, offer);
     }
 
     fn publish_node_status(&mut self) {
-        let rep_score = self.reputation.blocking_read().get_score(&self.peer_id.to_string()).cloned();
+        let rep_score = self
+            .reputation
+            .blocking_read()
+            .get_score(&self.peer_id.to_string())
+            .cloned();
         let status = serde_json::json!({
             "peer_id": self.peer_id.to_string(),
             "timestamp_secs": std::time::SystemTime::now()
@@ -380,7 +414,9 @@ impl NodeNetwork {
                     }
                 }
                 gossip::TOPIC_TRUST_EDGE => {
-                    if let Ok(edge) = serde_json::from_slice::<trust_graph::TrustEdge>(&message.data) {
+                    if let Ok(edge) =
+                        serde_json::from_slice::<trust_graph::TrustEdge>(&message.data)
+                    {
                         self.trust_graph.blocking_write().add_edge(edge);
                     }
                 }
@@ -418,12 +454,7 @@ fn handle_kademlia_event(event: kad::Event) {
 }
 
 fn handle_identify_event(swarm: &mut Swarm<FlovenetBehaviour>, event: identify::Event) {
-    if let identify::Event::Received {
-        peer_id,
-        info,
-        ..
-    } = event
-    {
+    if let identify::Event::Received { peer_id, info, .. } = event {
         for addr in info.listen_addrs {
             swarm.behaviour_mut().kademlia.add_address(&peer_id, addr);
         }

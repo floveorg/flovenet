@@ -11,7 +11,7 @@ use resource_manager::{NodeDescriptor, NodeResources, NodeRole};
 use scheduler::LocalScheduler;
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::EnvFilter;
-use vm_runtime::{Manifest, wasmtime_runner::WasmtimeRunner, Runner};
+use vm_runtime::{wasmtime_runner::WasmtimeRunner, Manifest, Runner};
 
 static HTTP_REQUESTS: LazyLock<IntCounter> = LazyLock::new(|| {
     register_int_counter!("flovenet_http_requests_total", "Total HTTP requests").unwrap()
@@ -59,7 +59,10 @@ async fn run_daemon(
 ) -> anyhow::Result<()> {
     let swarm_key = networking::load_swarm_key(swarm_key_path);
     if swarm_key_path.is_some() {
-        tracing::info!("Swarm key {}loaded", if swarm_key.is_some() { "" } else { "not " });
+        tracing::info!(
+            "Swarm key {}loaded",
+            if swarm_key.is_some() { "" } else { "not " }
+        );
     }
     tracing::info!("Starting flovenet daemon (libp2p port: {port}, api: {api_port}, roles: {roles:?}, bootstrap_peers: {})", bootstrap_peers.len());
 
@@ -89,7 +92,10 @@ async fn run_daemon(
         if let Err(e) = network.bootstrap_kademlia(bootstrap_peers) {
             tracing::warn!("Kademlia bootstrap failed: {e}");
         } else {
-            tracing::info!("Kademlia bootstrap requested against {} peer(s)", bootstrap_peers.len());
+            tracing::info!(
+                "Kademlia bootstrap requested against {} peer(s)",
+                bootstrap_peers.len()
+            );
         }
     }
 
@@ -110,57 +116,63 @@ async fn run_daemon(
     // Sigue sin firma criptográfica — Hito 6.1 añadirá attestations
     // firmadas por el requester sobre el provider.
 
-    network.set_job_handler(move |offer: market_protocol::JobOffer, requester: libp2p::PeerId| {
-        let _ = requester; // disponible para futuras políticas (ratelimit por requester, etc.)
-        let manifest = Manifest {
-            image_cid: offer.manifest_cid.clone(),
-            entrypoint: "_start".into(),
-            args: vec![],
-            max_duration_secs: offer.max_duration_secs,
-            slots_required: offer.slots_required,
-        };
+    network
+        .set_job_handler(
+            move |offer: market_protocol::JobOffer, requester: libp2p::PeerId| {
+                let _ = requester; // disponible para futuras políticas (ratelimit por requester, etc.)
+                let manifest = Manifest {
+                    image_cid: offer.manifest_cid.clone(),
+                    entrypoint: "_start".into(),
+                    args: vec![],
+                    max_duration_secs: offer.max_duration_secs,
+                    slots_required: offer.slots_required,
+                };
 
-        let requirement = scheduler::SlotRequirement {
-            cpu_cores: offer.slots_required,
-            ram_gb: 1.0,
-            disk_gb: 2.0,
-            gpu_vram_gb: None,
-        };
+                let requirement = scheduler::SlotRequirement {
+                    cpu_cores: offer.slots_required,
+                    ram_gb: 1.0,
+                    disk_gb: 2.0,
+                    gpu_vram_gb: None,
+                };
 
-        match scheduler.can_accept(&local_descriptor, &requirement, &resource_manager::NodeRole::Compute) {
-            scheduler::MatchResult::Rejected { reason } => market_protocol::JobResponse {
-                job_id: offer.job_id,
-                accepted: false,
-                reason: Some(reason),
-                result_cid: None,
-            },
-            scheduler::MatchResult::Accepted { .. } => {
-                let result = tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current().block_on(runner.run(manifest))
-                });
-
-                match result {
-                    Ok(run_result) => market_protocol::JobResponse {
-                        job_id: offer.job_id,
-                        accepted: true,
-                        reason: None,
-                        result_cid: Some(format!("exit:{}", run_result.exit_code)),
-                    },
-                    Err(e) => market_protocol::JobResponse {
+                match scheduler.can_accept(
+                    &local_descriptor,
+                    &requirement,
+                    &resource_manager::NodeRole::Compute,
+                ) {
+                    scheduler::MatchResult::Rejected { reason } => market_protocol::JobResponse {
                         job_id: offer.job_id,
                         accepted: false,
-                        reason: Some(e.to_string()),
+                        reason: Some(reason),
                         result_cid: None,
                     },
+                    scheduler::MatchResult::Accepted { .. } => {
+                        let result = tokio::task::block_in_place(|| {
+                            tokio::runtime::Handle::current().block_on(runner.run(manifest))
+                        });
+
+                        match result {
+                            Ok(run_result) => market_protocol::JobResponse {
+                                job_id: offer.job_id,
+                                accepted: true,
+                                reason: None,
+                                result_cid: Some(format!("exit:{}", run_result.exit_code)),
+                            },
+                            Err(e) => market_protocol::JobResponse {
+                                job_id: offer.job_id,
+                                accepted: false,
+                                reason: Some(e.to_string()),
+                                result_cid: None,
+                            },
+                        }
+                    }
                 }
-            }
-        }
-    }).await;
+            },
+        )
+        .await;
 
     // Metrics server in background
-    let metrics_handle = tokio::spawn(async move {
-        run_metrics_server(api_port).await
-    });
+    let metrics_handle = tokio::spawn(async move { run_metrics_server(api_port).await });
 
     // Run network event loop
     tokio::select! {
@@ -188,8 +200,19 @@ async fn run_api_gateway(port: u16) -> anyhow::Result<()> {
 
     let auth = graphql_api::auth::AuthManager::new("flovenet-dev-secret");
     let (event_tx, _) = tokio::sync::broadcast::channel(256);
-    let state = graphql_api::AppState { auth, event_tx, store: Default::default() };
-    graphql_api::run_gateway(graphql_api::GatewayConfig { port, peer_id: peer_id.to_string() }, state).await
+    let state = graphql_api::AppState {
+        auth,
+        event_tx,
+        store: Default::default(),
+    };
+    graphql_api::run_gateway(
+        graphql_api::GatewayConfig {
+            port,
+            peer_id: peer_id.to_string(),
+        },
+        state,
+    )
+    .await
 }
 
 #[tokio::main]
@@ -199,11 +222,20 @@ async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Daemon { port, api_port, roles, swarm_key, bootstrap_peers } => {
+        Commands::Daemon {
+            port,
+            api_port,
+            roles,
+            swarm_key,
+            bootstrap_peers,
+        } => {
             let parsed_roles: Vec<NodeRole> = if roles.is_empty() {
                 vec![NodeRole::Compute]
             } else {
-                roles.split(',').map(|r| r.trim().parse::<NodeRole>().unwrap_or(NodeRole::Compute)).collect()
+                roles
+                    .split(',')
+                    .map(|r| r.trim().parse::<NodeRole>().unwrap_or(NodeRole::Compute))
+                    .collect()
             };
             let parsed_bootstrap: Vec<libp2p::Multiaddr> = bootstrap_peers
                 .split(',')
@@ -217,7 +249,14 @@ async fn main() -> anyhow::Result<()> {
                     }
                 })
                 .collect();
-            run_daemon(port, api_port, parsed_roles, swarm_key.as_deref(), &parsed_bootstrap).await
+            run_daemon(
+                port,
+                api_port,
+                parsed_roles,
+                swarm_key.as_deref(),
+                &parsed_bootstrap,
+            )
+            .await
         }
         Commands::ApiGateway { port } => run_api_gateway(port).await,
         Commands::Share { role } => {
@@ -237,7 +276,11 @@ async fn main() -> anyhow::Result<()> {
                 let model = resources.gpu_model.as_deref().unwrap_or("unknown");
                 tracing::info!("  GPU: {model} ({vram:.0} GiB VRAM)");
                 let gpu_slots = resource_manager::gpu::GpuSlot::create_slots(vram, model);
-                tracing::info!("  GPU slots: {} ({} GiB each)", gpu_slots.len(), gpu_slots.first().map(|s| s.vram_gb).unwrap_or(0.0));
+                tracing::info!(
+                    "  GPU slots: {} ({} GiB each)",
+                    gpu_slots.len(),
+                    gpu_slots.first().map(|s| s.vram_gb).unwrap_or(0.0)
+                );
             }
             println!("{}", serde_json::to_string_pretty(&resources)?);
             Ok(())
@@ -253,7 +296,11 @@ async fn main() -> anyhow::Result<()> {
             tracing::info!("Running WASM locally: {manifest:?}");
             let runner = WasmtimeRunner::new();
             let result = runner.run(manifest).await?;
-            tracing::info!("Exit code: {}, duration: {:.2}s", result.exit_code, result.metrics.duration_secs);
+            tracing::info!(
+                "Exit code: {}, duration: {:.2}s",
+                result.exit_code,
+                result.metrics.duration_secs
+            );
             println!("{}", serde_json::to_string_pretty(&result)?);
             Ok(())
         }
@@ -262,8 +309,14 @@ async fn main() -> anyhow::Result<()> {
             println!("Flovenet Node Status");
             println!("====================");
             println!("CPU cores: {}", resources.cpu_cores);
-            println!("RAM: {:.1}/{:.1} GB", resources.ram_available_gb, resources.ram_total_gb);
-            println!("Disk: {:.1}/{:.1} GB", resources.disk_available_gb, resources.disk_total_gb);
+            println!(
+                "RAM: {:.1}/{:.1} GB",
+                resources.ram_available_gb, resources.ram_total_gb
+            );
+            println!(
+                "Disk: {:.1}/{:.1} GB",
+                resources.disk_available_gb, resources.disk_total_gb
+            );
             println!("Uptime: {}s", resources.uptime_secs);
             if let Some(vram) = resources.gpu_vram_gb {
                 let model = resources.gpu_model.as_deref().unwrap_or("unknown");

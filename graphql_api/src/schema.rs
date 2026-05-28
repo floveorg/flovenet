@@ -57,7 +57,11 @@ pub struct QueryRoot;
 
 #[Object]
 impl QueryRoot {
-    async fn available_gateways(&self, _ctx: &Context<'_>, _region: Option<String>) -> Vec<GatewayInfo> {
+    async fn available_gateways(
+        &self,
+        _ctx: &Context<'_>,
+        _region: Option<String>,
+    ) -> Vec<GatewayInfo> {
         Vec::new()
     }
 
@@ -78,7 +82,9 @@ impl QueryRoot {
         offset: Option<i32>,
     ) -> Vec<FeedItem> {
         let state = ctx.data_unchecked::<AppState>();
-        state.get_feed(limit.unwrap_or(20) as usize, offset.unwrap_or(0) as usize).await
+        state
+            .get_feed(limit.unwrap_or(20) as usize, offset.unwrap_or(0) as usize)
+            .await
     }
 
     async fn search_profiles(&self, ctx: &Context<'_>, query: String) -> Vec<Profile> {
@@ -98,7 +104,9 @@ impl QueryRoot {
         limit: Option<i32>,
     ) -> Vec<Profile> {
         let state = ctx.data_unchecked::<AppState>();
-        state.get_followers(&peer_id, limit.unwrap_or(50) as usize).await
+        state
+            .get_followers(&peer_id, limit.unwrap_or(50) as usize)
+            .await
     }
 
     async fn following(
@@ -108,7 +116,9 @@ impl QueryRoot {
         limit: Option<i32>,
     ) -> Vec<Profile> {
         let state = ctx.data_unchecked::<AppState>();
-        state.get_following(&peer_id, limit.unwrap_or(50) as usize).await
+        state
+            .get_following(&peer_id, limit.unwrap_or(50) as usize)
+            .await
     }
 }
 
@@ -145,7 +155,9 @@ impl MutationRoot {
         parent: Option<String>,
     ) -> async_graphql::Result<Post> {
         let state = ctx.data_unchecked::<AppState>();
-        state.create_post("user", &content, media.unwrap_or_default(), parent).await
+        state
+            .create_post("user", &content, media.unwrap_or_default(), parent)
+            .await
     }
 
     async fn delete_post(&self, ctx: &Context<'_>, cid: String) -> async_graphql::Result<bool> {
@@ -153,20 +165,12 @@ impl MutationRoot {
         state.delete_post(&cid).await
     }
 
-    async fn follow(
-        &self,
-        ctx: &Context<'_>,
-        peer_id: String,
-    ) -> async_graphql::Result<bool> {
+    async fn follow(&self, ctx: &Context<'_>, peer_id: String) -> async_graphql::Result<bool> {
         let state = ctx.data_unchecked::<AppState>();
         state.follow_user("user", &peer_id).await
     }
 
-    async fn unfollow(
-        &self,
-        ctx: &Context<'_>,
-        peer_id: String,
-    ) -> async_graphql::Result<bool> {
+    async fn unfollow(&self, ctx: &Context<'_>, peer_id: String) -> async_graphql::Result<bool> {
         let state = ctx.data_unchecked::<AppState>();
         state.unfollow_user("user", &peer_id).await
     }
@@ -179,7 +183,9 @@ impl MutationRoot {
         avatar_cid: Option<String>,
     ) -> async_graphql::Result<Profile> {
         let state = ctx.data_unchecked::<AppState>();
-        state.update_profile("user", display_name, bio, avatar_cid).await
+        state
+            .update_profile("user", display_name, bio, avatar_cid)
+            .await
     }
 }
 
@@ -258,7 +264,11 @@ mod tests {
             post_count: 1,
             reputation: None,
         };
-        let item = FeedItem { post, author, score: Some(42.5) };
+        let item = FeedItem {
+            post,
+            author,
+            score: Some(42.5),
+        };
         let json = serde_json::to_string(&item).unwrap();
         let decoded: FeedItem = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.post.cid, "cid-1");

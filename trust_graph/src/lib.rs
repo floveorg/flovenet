@@ -219,7 +219,10 @@ impl TrustGraph {
 
                 // Collect next-hop intermediaries
                 for edge in self.edges.values() {
-                    if edge.signer == *intermediary && edge.target != target && !visited.contains(&edge.target) {
+                    if edge.signer == *intermediary
+                        && edge.target != target
+                        && !visited.contains(&edge.target)
+                    {
                         next_hop.push(edge.target.clone());
                     }
                 }
@@ -452,12 +455,18 @@ mod tests {
             reputation_engine::ReputationEvent {
                 peer_id: "bob".into(),
                 timestamp: Utc::now(),
-                kind: reputation_engine::EventKind::Contribution { hours: 50.0, uptime_pct: 99.0 },
+                kind: reputation_engine::EventKind::Contribution {
+                    hours: 50.0,
+                    uptime_pct: 99.0,
+                },
             },
             reputation_engine::ReputationEvent {
                 peer_id: "carol".into(),
                 timestamp: Utc::now(),
-                kind: reputation_engine::EventKind::Contribution { hours: 10.0, uptime_pct: 50.0 },
+                kind: reputation_engine::EventKind::Contribution {
+                    hours: 10.0,
+                    uptime_pct: 50.0,
+                },
             },
         ]);
         rep.recompute_all();
@@ -557,13 +566,7 @@ mod tests {
     #[test]
     fn test_signed_edge_roundtrip_valid() {
         let key = crypto::generate_keypair();
-        let edge = TrustEdge::signed(
-            "alice".into(),
-            "bob".into(),
-            0.7,
-            Utc::now(),
-            &key,
-        );
+        let edge = TrustEdge::signed("alice".into(), "bob".into(), 0.7, Utc::now(), &key);
         assert_eq!(edge.verify(), VerifyOutcome::Valid);
     }
 
@@ -576,13 +579,7 @@ mod tests {
     #[test]
     fn test_tampered_weight_is_invalid() {
         let key = crypto::generate_keypair();
-        let mut edge = TrustEdge::signed(
-            "alice".into(),
-            "bob".into(),
-            0.7,
-            Utc::now(),
-            &key,
-        );
+        let mut edge = TrustEdge::signed("alice".into(), "bob".into(), 0.7, Utc::now(), &key);
         // attacker modifies weight after signing
         edge.weight = 1.0;
         assert_eq!(edge.verify(), VerifyOutcome::Invalid);
@@ -592,13 +589,7 @@ mod tests {
     fn test_wrong_pubkey_is_invalid() {
         let key_alice = crypto::generate_keypair();
         let key_eve = crypto::generate_keypair();
-        let mut edge = TrustEdge::signed(
-            "alice".into(),
-            "bob".into(),
-            0.7,
-            Utc::now(),
-            &key_alice,
-        );
+        let mut edge = TrustEdge::signed("alice".into(), "bob".into(), 0.7, Utc::now(), &key_alice);
         // Eve tries to claim she's alice by swapping the embedded pubkey
         edge.signer_pubkey = key_eve.verifying_key().to_bytes().to_vec();
         assert_eq!(edge.verify(), VerifyOutcome::Invalid);
@@ -607,13 +598,7 @@ mod tests {
     #[test]
     fn test_add_edge_rejects_invalid_signature() {
         let key = crypto::generate_keypair();
-        let mut edge = TrustEdge::signed(
-            "alice".into(),
-            "bob".into(),
-            0.7,
-            Utc::now(),
-            &key,
-        );
+        let mut edge = TrustEdge::signed("alice".into(), "bob".into(), 0.7, Utc::now(), &key);
         edge.weight = 0.1; // tamper
         let mut graph = TrustGraph::new();
         graph.add_edge(edge);
