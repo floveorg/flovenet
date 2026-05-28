@@ -1,0 +1,5 @@
+*.log
+*.pid
+discovery-test/
+docker-test/
+start.txt

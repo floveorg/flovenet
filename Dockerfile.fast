@@ -1,0 +1,9 @@
+# Dockerfile.fast — para tests rápidos en la máquina del dev.
+# Reusa el binario ya compilado en target/release del host (glibc 2.39).
+# El Dockerfile principal (cargo-chef + multi-stage) sigue siendo el
+# canónico para CI / releases.
+FROM ubuntu:24.04
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY target/release/daemon /usr/local/bin/flovenet
+EXPOSE 4001 8080 9090 9091 9092 9093
+ENTRYPOINT ["flovenet"]

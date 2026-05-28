@@ -1,31 +1,39 @@
 services:
+  # node1 actúa como bootstrap: puerto libp2p fijo y conocido
   node1:
     image: flovenet:latest
-    command: daemon --port 0 --api-port 9091 --roles compute,storage
+    command: daemon --port 4001 --api-port 9091 --roles compute,storage
     ports:
       - "9091:9091"
     environment:
-      - RUST_LOG=info
+      - RUST_LOG=info,libp2p_mdns=info,libp2p_kad=info
     networks:
       - flovenet
 
+  # node2/3 + gateway hacen bootstrap dial contra node1 por nombre DNS docker
+  # (sin /p2p/<peer_id> porque no podemos predecirlo entre runs).
+  # Además mDNS dentro del bridge funciona como discovery secundario.
   node2:
     image: flovenet:latest
-    command: daemon --port 0 --api-port 9092 --roles compute
+    command: daemon --port 0 --api-port 9092 --roles compute --bootstrap-peers /dns4/node1/tcp/4001
     ports:
       - "9092:9092"
     environment:
-      - RUST_LOG=info
+      - RUST_LOG=info,libp2p_mdns=info,libp2p_kad=info
+    depends_on:
+      - node1
     networks:
       - flovenet
 
   node3:
     image: flovenet:latest
-    command: daemon --port 0 --api-port 9093 --roles storage
+    command: daemon --port 0 --api-port 9093 --roles storage --bootstrap-peers /dns4/node1/tcp/4001
     ports:
       - "9093:9093"
     environment:
-      - RUST_LOG=info
+      - RUST_LOG=info,libp2p_mdns=info,libp2p_kad=info
+    depends_on:
+      - node1
     networks:
       - flovenet
 
@@ -35,7 +43,9 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - RUST_LOG=info
+      - RUST_LOG=info,libp2p_mdns=info,libp2p_kad=info
+    depends_on:
+      - node1
     networks:
       - flovenet
 

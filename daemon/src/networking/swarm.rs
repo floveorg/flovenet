@@ -5,7 +5,7 @@ use futures::StreamExt;
 use libp2p::kad::{self, store::MemoryStore};
 use libp2p::request_response::{self, Message};
 use libp2p::{
-    gossipsub, identify, identity, ping,
+    gossipsub, identify, identity, mdns, ping,
     swarm::{NetworkBehaviour, SwarmEvent},
     Multiaddr, PeerId, Swarm, Transport,
 };
@@ -26,6 +26,7 @@ pub struct FlovenetBehaviour {
     pub gossipsub: gossipsub::Behaviour,
     pub identify: identify::Behaviour,
     pub ping: ping::Behaviour,
+    pub mdns: mdns::tokio::Behaviour,
     pub job_market: JobBehaviour,
     pub block_cache: p2p_cache::CacheBehaviour,
 }
@@ -95,11 +96,17 @@ impl NodeNetwork {
         let job_market = market_protocol::create_job_behaviour();
         let block_cache_behaviour = p2p_cache::create_cache_behaviour();
 
+        // mDNS: LAN auto-discovery (zero-config). Works inside the same docker
+        // bridge network too. Errors are non-fatal: a node without mDNS just
+        // relies on --bootstrap-peers / explicit dial.
+        let mdns = mdns::tokio::Behaviour::new(mdns::Config::default(), peer_id)?;
+
         let behaviour = FlovenetBehaviour {
             kademlia: kad,
             gossipsub: gs,
             identify,
             ping,
+            mdns,
             job_market,
             block_cache: block_cache_behaviour,
         };
@@ -136,22 +143,43 @@ impl NodeNetwork {
         })
     }
 
-    /// Bootstrap Kademlia with known peers
-    #[allow(dead_code)]
+    /// Bootstrap Kademlia with known peers.
+    ///
+    /// Two forms are accepted per entry:
+    ///   • `/dns4/host/tcp/PORT/p2p/PEER_ID` — full multiaddr → goes straight
+    ///     into the Kademlia routing table.
+    ///   • `/dns4/host/tcp/PORT` (no `/p2p/…` suffix) — we don't know the
+    ///     remote PeerId yet, so we just `dial` the multiaddr. `identify`
+    ///     will fill the routing table once the handshake completes.
+    ///
+    /// Triggers a Kademlia bootstrap query if at least one known PeerId was
+    /// registered.
     pub fn bootstrap_kademlia(&mut self, bootstrap_peers: &[Multiaddr]) -> Result<()> {
+        let mut registered_with_peer_id = 0;
         for addr in bootstrap_peers {
-            if let Some(peer_id) = addr.iter().last().and_then(|p| match p {
+            let peer_id_opt = addr.iter().last().and_then(|p| match p {
                 libp2p::core::multiaddr::Protocol::P2p(h) => Some(h),
                 _ => None,
-            }) {
-                self.swarm
-                    .behaviour_mut()
-                    .kademlia
-                    .add_address(&peer_id, addr.clone());
+            });
+
+            match peer_id_opt {
+                Some(peer_id) => {
+                    self.swarm
+                        .behaviour_mut()
+                        .kademlia
+                        .add_address(&peer_id, addr.clone());
+                    registered_with_peer_id += 1;
+                }
+                None => {
+                    info!("bootstrap dial (no peer_id yet): {addr}");
+                    if let Err(e) = self.swarm.dial(addr.clone()) {
+                        warn!("bootstrap dial of {addr} failed: {e}");
+                    }
+                }
             }
         }
 
-        if !bootstrap_peers.is_empty() {
+        if registered_with_peer_id > 0 {
             self.swarm.behaviour_mut().kademlia.bootstrap()?;
         }
 
@@ -196,6 +224,9 @@ impl NodeNetwork {
                 }
                 SwarmEvent::Behaviour(FlovenetBehaviourEvent::Ping(event)) => {
                     handle_ping_event(event);
+                }
+                SwarmEvent::Behaviour(FlovenetBehaviourEvent::Mdns(event)) => {
+                    handle_mdns_event(&mut self.swarm, event);
                 }
                 SwarmEvent::Behaviour(FlovenetBehaviourEvent::JobMarket(event)) => {
                     self.handle_job_market_event(event).await;
@@ -386,5 +417,32 @@ fn handle_ping_event(event: ping::Event) {
     } = event
     {
         trace!("Ping to {peer}: {rtt:?}");
+    }
+}
+
+/// Handle mDNS events: add discovered peers to Kademlia and dial them so
+/// the gossipsub mesh forms automatically. On expiry, the peer stays in
+/// Kademlia (TTL there) — we just stop tracking it as mDNS-reachable.
+fn handle_mdns_event(swarm: &mut Swarm<FlovenetBehaviour>, event: mdns::Event) {
+    match event {
+        mdns::Event::Discovered(peers) => {
+            for (peer_id, addr) in peers {
+                info!("mDNS discovered {peer_id} at {addr}");
+                swarm
+                    .behaviour_mut()
+                    .kademlia
+                    .add_address(&peer_id, addr.clone());
+                // Also let gossipsub know this is a candidate explicitly
+                swarm.behaviour_mut().gossipsub.add_explicit_peer(&peer_id);
+                if let Err(e) = swarm.dial(addr) {
+                    warn!("mDNS dial to {peer_id} failed: {e}");
+                }
+            }
+        }
+        mdns::Event::Expired(peers) => {
+            for (peer_id, _addr) in peers {
+                trace!("mDNS expired {peer_id}");
+            }
+        }
     }
 }

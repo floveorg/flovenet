@@ -51,12 +51,18 @@ async fn run_metrics_server(port: u16) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn run_daemon(port: u16, api_port: u16, roles: Vec<NodeRole>, swarm_key_path: Option<&str>) -> anyhow::Result<()> {
+async fn run_daemon(
+    port: u16,
+    api_port: u16,
+    roles: Vec<NodeRole>,
+    swarm_key_path: Option<&str>,
+    bootstrap_peers: &[libp2p::Multiaddr],
+) -> anyhow::Result<()> {
     let swarm_key = networking::load_swarm_key(swarm_key_path);
     if swarm_key_path.is_some() {
         tracing::info!("Swarm key {}loaded", if swarm_key.is_some() { "" } else { "not " });
     }
-    tracing::info!("Starting flovenet daemon (libp2p port: {port}, api: {api_port}, roles: {roles:?})");
+    tracing::info!("Starting flovenet daemon (libp2p port: {port}, api: {api_port}, roles: {roles:?}, bootstrap_peers: {})", bootstrap_peers.len());
 
     let resources = NodeResources::detect();
     let total_slots = roles
@@ -78,6 +84,15 @@ async fn run_daemon(port: u16, api_port: u16, roles: Vec<NodeRole>, swarm_key_pa
     let peer_id = network.peer_id;
     let listen_addr = network.listen_addr.clone();
     tracing::info!("Peer ID: {peer_id}, listening on {listen_addr}");
+
+    // Apply explicit bootstrap peers (combines with mDNS LAN discovery).
+    if !bootstrap_peers.is_empty() {
+        if let Err(e) = network.bootstrap_kademlia(bootstrap_peers) {
+            tracing::warn!("Kademlia bootstrap failed: {e}");
+        } else {
+            tracing::info!("Kademlia bootstrap requested against {} peer(s)", bootstrap_peers.len());
+        }
+    }
 
     let runner = WasmtimeRunner::new();
     let mut scheduler = LocalScheduler::new();
@@ -194,13 +209,25 @@ async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Daemon { port, api_port, roles, swarm_key } => {
+        Commands::Daemon { port, api_port, roles, swarm_key, bootstrap_peers } => {
             let parsed_roles: Vec<NodeRole> = if roles.is_empty() {
                 vec![NodeRole::Compute]
             } else {
                 roles.split(',').map(|r| r.trim().parse::<NodeRole>().unwrap_or(NodeRole::Compute)).collect()
             };
-            run_daemon(port, api_port, parsed_roles, swarm_key.as_deref()).await
+            let parsed_bootstrap: Vec<libp2p::Multiaddr> = bootstrap_peers
+                .split(',')
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .filter_map(|s| match s.parse::<libp2p::Multiaddr>() {
+                    Ok(addr) => Some(addr),
+                    Err(e) => {
+                        tracing::warn!("ignoring invalid bootstrap multiaddr `{s}`: {e}");
+                        None
+                    }
+                })
+                .collect();
+            run_daemon(port, api_port, parsed_roles, swarm_key.as_deref(), &parsed_bootstrap).await
         }
         Commands::ApiGateway { port } => run_api_gateway(port).await,
         Commands::Share { role } => {

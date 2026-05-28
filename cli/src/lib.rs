@@ -23,6 +23,10 @@ pub enum Commands {
         /// Swarm key file (PSK) for private sub-network
         #[arg(long)]
         swarm_key: Option<String>,
+        /// Bootstrap multiaddrs separados por coma. Ejemplo:
+        /// `/ip4/10.0.0.5/tcp/4001/p2p/12D3Koo...`. Se combina con mDNS.
+        #[arg(long, default_value_t = String::new())]
+        bootstrap_peers: String,
     },
     /// Inicia el gateway GraphQL
     ApiGateway {
@@ -57,11 +61,12 @@ mod tests {
     fn test_cli_daemon_defaults() {
         let cli = Cli::parse_from(["flovenet", "daemon"]);
         match cli.command {
-            Commands::Daemon { port, api_port, roles, swarm_key } => {
+            Commands::Daemon { port, api_port, roles, swarm_key, bootstrap_peers } => {
                 assert_eq!(port, 0);
                 assert_eq!(api_port, 9090);
                 assert!(roles.is_empty());
                 assert!(swarm_key.is_none());
+                assert!(bootstrap_peers.is_empty());
             }
             _ => panic!("expected Daemon command"),
         }
@@ -69,13 +74,22 @@ mod tests {
 
     #[test]
     fn test_cli_daemon_with_args() {
-        let cli = Cli::parse_from(["flovenet", "daemon", "--port", "9091", "--api-port", "9092", "--roles", "compute,storage", "--swarm-key", "key.bin"]);
+        let cli = Cli::parse_from([
+            "flovenet", "daemon",
+            "--port", "9091",
+            "--api-port", "9092",
+            "--roles", "compute,storage",
+            "--swarm-key", "key.bin",
+            "--bootstrap-peers", "/ip4/10.0.0.1/tcp/4001/p2p/12D3KooWA,/ip4/10.0.0.2/tcp/4001/p2p/12D3KooWB",
+        ]);
         match cli.command {
-            Commands::Daemon { port, api_port, roles, swarm_key } => {
+            Commands::Daemon { port, api_port, roles, swarm_key, bootstrap_peers } => {
                 assert_eq!(port, 9091);
                 assert_eq!(api_port, 9092);
                 assert_eq!(roles, "compute,storage");
                 assert_eq!(swarm_key, Some("key.bin".into()));
+                assert!(bootstrap_peers.contains("12D3KooWA"));
+                assert!(bootstrap_peers.contains("12D3KooWB"));
             }
             _ => panic!("expected Daemon command"),
         }
