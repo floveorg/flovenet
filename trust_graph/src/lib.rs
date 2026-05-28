@@ -3,6 +3,7 @@ use std::collections::{HashMap, HashSet};
 use chrono::{DateTime, Utc};
 use reputation_engine::ReputationState;
 use serde::{Deserialize, Serialize};
+use tracing::warn;
 
 /// A signed trust statement from `signer` trusting `target` with a given weight.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -11,9 +12,90 @@ pub struct TrustEdge {
     pub target: String,
     /// Trust weight: 0.0 (no trust) to 1.0 (absolute trust)
     pub weight: f64,
-    /// Ed25519 signature over (signer || target || weight || timestamp)
+    /// Ed25519 signature over the canonical payload (see `TrustEdge::payload`).
     pub signature: Vec<u8>,
     pub timestamp: DateTime<Utc>,
+    /// Ed25519 public key (raw 32 bytes) of `signer`. Optional for
+    /// backward compat with edges produced before Hito 0.2; if empty,
+    /// `verify()` returns `Unverified` and the graph accepts the edge
+    /// with a warning. New code should always populate this.
+    #[serde(default)]
+    pub signer_pubkey: Vec<u8>,
+}
+
+/// Outcome of [`TrustEdge::verify`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VerifyOutcome {
+    /// Pubkey present, signature present and valid for the payload.
+    Valid,
+    /// Pubkey or signature missing — cannot verify, but caller may
+    /// still accept (compat mode).
+    Unverified,
+    /// Pubkey and signature present but signature does NOT match payload.
+    Invalid,
+}
+
+impl TrustEdge {
+    /// Canonical bytes to sign: `signer | target | weight | unix_ts`. The
+    /// format is intentionally simple so any client can reproduce it.
+    pub fn payload(&self) -> Vec<u8> {
+        format!(
+            "{}|{}|{}|{}",
+            self.signer,
+            self.target,
+            self.weight,
+            self.timestamp.timestamp_millis()
+        )
+        .into_bytes()
+    }
+
+    /// Create a signed edge from a signing key. Used by tests and by
+    /// any node that wants to publish a trust statement.
+    pub fn signed(
+        signer: String,
+        target: String,
+        weight: f64,
+        timestamp: DateTime<Utc>,
+        signing_key: &crypto::SigningKey,
+    ) -> Self {
+        use crypto::Signer;
+        let mut edge = TrustEdge {
+            signer,
+            target,
+            weight,
+            signature: Vec::new(),
+            timestamp,
+            signer_pubkey: signing_key.verifying_key().to_bytes().to_vec(),
+        };
+        let sig = signing_key.sign(&edge.payload());
+        edge.signature = sig.to_bytes().to_vec();
+        edge
+    }
+
+    /// Verify the signature against `signer_pubkey`.
+    pub fn verify(&self) -> VerifyOutcome {
+        if self.signer_pubkey.is_empty() || self.signature.is_empty() {
+            return VerifyOutcome::Unverified;
+        }
+        let pk_bytes: [u8; 32] = match self.signer_pubkey.as_slice().try_into() {
+            Ok(b) => b,
+            Err(_) => return VerifyOutcome::Invalid,
+        };
+        let pk = match crypto::VerifyingKey::from_bytes(&pk_bytes) {
+            Ok(k) => k,
+            Err(_) => return VerifyOutcome::Invalid,
+        };
+        let sig_bytes: [u8; 64] = match self.signature.as_slice().try_into() {
+            Ok(b) => b,
+            Err(_) => return VerifyOutcome::Invalid,
+        };
+        let sig = crypto::Signature::from_bytes(&sig_bytes);
+        use crypto::Verifier;
+        match pk.verify(&self.payload(), &sig) {
+            Ok(()) => VerifyOutcome::Valid,
+            Err(_) => VerifyOutcome::Invalid,
+        }
+    }
 }
 
 /// CRDT-style trust graph: map of (signer, target) -> TrustEdge.
@@ -37,8 +119,36 @@ impl TrustGraph {
         }
     }
 
-    /// Add or update a trust edge. If the incoming edge is newer, it replaces the existing one.
+    /// Add or update a trust edge.
+    ///
+    /// Hito 0.2: the edge signature is now verified. Behaviour:
+    /// - `Invalid` (pubkey+signature present but mismatch) → **rejected**,
+    ///   warning logged.
+    /// - `Unverified` (missing pubkey or signature) → accepted but
+    ///   warning logged. New code should always sign.
+    /// - `Valid` → accepted silently.
+    ///
+    /// Idempotency: if the existing edge is newer, the incoming is dropped.
     pub fn add_edge(&mut self, edge: TrustEdge) {
+        match edge.verify() {
+            VerifyOutcome::Invalid => {
+                warn!(
+                    signer = %edge.signer,
+                    target = %edge.target,
+                    "TrustEdge rejected: signature does not verify"
+                );
+                return;
+            }
+            VerifyOutcome::Unverified => {
+                warn!(
+                    signer = %edge.signer,
+                    target = %edge.target,
+                    "TrustEdge accepted without verification (no pubkey/signature)"
+                );
+            }
+            VerifyOutcome::Valid => {}
+        }
+
         let key = (edge.signer.clone(), edge.target.clone());
         if let Some(existing) = self.edges.get(&key) {
             if edge.timestamp <= existing.timestamp {
@@ -232,13 +342,30 @@ mod tests {
     use super::*;
 
     fn make_edge(signer: &str, target: &str, weight: f64) -> TrustEdge {
+        // Helper for legacy tests: unsigned edge (Unverified path).
         TrustEdge {
             signer: signer.to_string(),
             target: target.to_string(),
             weight,
             signature: vec![],
             timestamp: Utc::now(),
+            signer_pubkey: vec![],
         }
+    }
+
+    fn make_signed_edge(
+        signer_label: &str,
+        target: &str,
+        weight: f64,
+        key: &crypto::SigningKey,
+    ) -> TrustEdge {
+        TrustEdge::signed(
+            signer_label.to_string(),
+            target.to_string(),
+            weight,
+            Utc::now(),
+            key,
+        )
     }
 
     #[test]
@@ -264,6 +391,7 @@ mod tests {
             weight: 0.8,
             signature: vec![],
             timestamp: DateTime::from_timestamp(1000, 0).unwrap(),
+            signer_pubkey: vec![],
         };
         let new = TrustEdge {
             signer: "alice".into(),
@@ -271,6 +399,7 @@ mod tests {
             weight: 0.2,
             signature: vec![],
             timestamp: Utc::now(),
+            signer_pubkey: vec![],
         };
         graph.add_edge(old);
         graph.add_edge(new);
@@ -421,5 +550,93 @@ mod tests {
         // Direct = 0.0, transitive = 0.6 * 0.5 * 0.5 = 0.15
         // Score = max(0.0, 0.15 * 0.3) = 0.045
         assert!((score - 0.045).abs() < 0.001);
+    }
+
+    // ───────── Hito 0.2: signature verification ─────────
+
+    #[test]
+    fn test_signed_edge_roundtrip_valid() {
+        let key = crypto::generate_keypair();
+        let edge = TrustEdge::signed(
+            "alice".into(),
+            "bob".into(),
+            0.7,
+            Utc::now(),
+            &key,
+        );
+        assert_eq!(edge.verify(), VerifyOutcome::Valid);
+    }
+
+    #[test]
+    fn test_unsigned_edge_is_unverified() {
+        let edge = make_edge("alice", "bob", 0.5);
+        assert_eq!(edge.verify(), VerifyOutcome::Unverified);
+    }
+
+    #[test]
+    fn test_tampered_weight_is_invalid() {
+        let key = crypto::generate_keypair();
+        let mut edge = TrustEdge::signed(
+            "alice".into(),
+            "bob".into(),
+            0.7,
+            Utc::now(),
+            &key,
+        );
+        // attacker modifies weight after signing
+        edge.weight = 1.0;
+        assert_eq!(edge.verify(), VerifyOutcome::Invalid);
+    }
+
+    #[test]
+    fn test_wrong_pubkey_is_invalid() {
+        let key_alice = crypto::generate_keypair();
+        let key_eve = crypto::generate_keypair();
+        let mut edge = TrustEdge::signed(
+            "alice".into(),
+            "bob".into(),
+            0.7,
+            Utc::now(),
+            &key_alice,
+        );
+        // Eve tries to claim she's alice by swapping the embedded pubkey
+        edge.signer_pubkey = key_eve.verifying_key().to_bytes().to_vec();
+        assert_eq!(edge.verify(), VerifyOutcome::Invalid);
+    }
+
+    #[test]
+    fn test_add_edge_rejects_invalid_signature() {
+        let key = crypto::generate_keypair();
+        let mut edge = TrustEdge::signed(
+            "alice".into(),
+            "bob".into(),
+            0.7,
+            Utc::now(),
+            &key,
+        );
+        edge.weight = 0.1; // tamper
+        let mut graph = TrustGraph::new();
+        graph.add_edge(edge);
+        assert_eq!(graph.edge_count(), 0);
+        assert_eq!(graph.direct_trust("alice", "bob"), 0.0);
+    }
+
+    #[test]
+    fn test_add_edge_accepts_valid_signature() {
+        let key = crypto::generate_keypair();
+        let edge = make_signed_edge("alice", "bob", 0.8, &key);
+        let mut graph = TrustGraph::new();
+        graph.add_edge(edge);
+        assert_eq!(graph.edge_count(), 1);
+        assert!((graph.direct_trust("alice", "bob") - 0.8).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_add_edge_accepts_unverified_with_warning() {
+        // Backward-compat path: unsigned edges still go in (warn-only).
+        let edge = make_edge("alice", "bob", 0.5);
+        let mut graph = TrustGraph::new();
+        graph.add_edge(edge);
+        assert_eq!(graph.edge_count(), 1);
     }
 }

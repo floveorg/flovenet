@@ -2,11 +2,13 @@ pub mod error;
 
 use argon2::Argon2;
 use chacha20poly1305::{ChaCha20Poly1305, KeyInit, Nonce, aead::AeadInPlace};
-use ed25519_dalek::{Signer, SigningKey, Verifier, VerifyingKey};
 use rand::{Rng, rngs::OsRng};
 use serde::{Deserialize, Serialize};
 
-pub use ed25519_dalek::{Signature, SECRET_KEY_LENGTH as ED25519_SEED_LEN};
+pub use ed25519_dalek::{
+    Signature, Signer, SigningKey, Verifier, VerifyingKey,
+    SECRET_KEY_LENGTH as ED25519_SEED_LEN,
+};
 pub use error::CryptoError;
 
 pub type Result<T> = std::result::Result<T, CryptoError>;

@@ -11,7 +11,7 @@ use libp2p::{
 };
 use market_protocol::{JobBehaviour, JobOffer, JobResponse};
 use p2p_cache::{BlockCache, BlockRequest, BlockResponse};
-use reputation_engine::ReputationState;
+use reputation_engine::{EventKind, ReputationEvent, ReputationState};
 use tokio::sync::{Mutex, RwLock};
 use trust_graph::TrustGraph;
 use tracing::{info, trace, warn};
@@ -38,16 +38,20 @@ pub struct NodeNetwork {
     #[allow(dead_code)]
     pub keypair: identity::Keypair,
     pub listen_addr: Multiaddr,
-    pub job_handler: Arc<Mutex<Option<Box<dyn FnMut(JobOffer) -> JobResponse + Send>>>>,
+    pub job_handler: Arc<Mutex<Option<Box<dyn FnMut(JobOffer, PeerId) -> JobResponse + Send>>>>,
     pub reputation: Arc<RwLock<ReputationState>>,
     pub trust_graph: Arc<RwLock<TrustGraph>>,
     pub block_cache: Arc<BlockCache>,
 }
 
 impl NodeNetwork {
+    /// Register a callback that decides how to respond to a `JobOffer`.
+    /// The closure receives the offer and the **remote** PeerId that sent
+    /// it — necessary so that reputation events are attributed to the
+    /// requester, not to the local node (Hito 0.3).
     pub async fn set_job_handler<F>(&mut self, handler: F)
     where
-        F: FnMut(JobOffer) -> JobResponse + Send + 'static,
+        F: FnMut(JobOffer, PeerId) -> JobResponse + Send + 'static,
     {
         *self.job_handler.lock().await = Some(Box::new(handler));
     }
@@ -250,7 +254,7 @@ impl NodeNetwork {
                         let response = {
                             let mut guard = self.job_handler.lock().await;
                             match guard.as_mut() {
-                                Some(handler) => handler(request),
+                                Some(handler) => handler(request, peer),
                                 None => JobResponse {
                                     job_id: request.job_id,
                                     accepted: false,
@@ -265,6 +269,23 @@ impl NodeNetwork {
                         request_id, response, ..
                     } => {
                         info!("Job response for {}: accepted={}", request_id, response.accepted);
+                        // Hito 0.3 — requester rates the PROVIDER. The
+                        // `peer` of the outer event is the responder. The
+                        // event is unsigned today (Hito 6.1 will add a
+                        // requester signature so other nodes can verify).
+                        let provider_id = peer.to_string();
+                        let kind = if response.accepted {
+                            EventKind::JobSuccess
+                        } else {
+                            EventKind::JobFailure
+                        };
+                        let mut rep = self.reputation.write().await;
+                        rep.apply_events(&[ReputationEvent {
+                            peer_id: provider_id,
+                            timestamp: chrono::Utc::now(),
+                            kind,
+                        }]);
+                        rep.recompute_all();
                     }
                 }
             }

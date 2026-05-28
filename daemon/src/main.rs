@@ -7,7 +7,6 @@ use axum::{routing::get, Router};
 use clap::Parser;
 use cli::{Cli, Commands};
 use prometheus::{register_int_counter, Encoder, IntCounter, TextEncoder};
-use reputation_engine::{EventKind, ReputationEvent};
 use resource_manager::{NodeDescriptor, NodeResources, NodeRole};
 use scheduler::LocalScheduler;
 use tower_http::cors::CorsLayer;
@@ -103,10 +102,16 @@ async fn run_daemon(
         scheduler.merge_reputation(&rep);
     }
 
-    let rep_arc = network.reputation.clone();
-    let peer_id_for_handler = peer_id.to_string();
+    // Hito 0.3 — Antes: el handler grababa `record_job_outcome` sobre el
+    // peer_id LOCAL → self-rating trivial. Solución mínima sin cambiar el
+    // wire format: el provider deja de auto-puntuarse aquí; el rating real
+    // lo emite el REQUESTER cuando recibe la `JobResponse`
+    // (ver `swarm.rs::handle_job_market_event` rama `Message::Response`).
+    // Sigue sin firma criptográfica — Hito 6.1 añadirá attestations
+    // firmadas por el requester sobre el provider.
 
-    network.set_job_handler(move |offer: market_protocol::JobOffer| {
+    network.set_job_handler(move |offer: market_protocol::JobOffer, requester: libp2p::PeerId| {
+        let _ = requester; // disponible para futuras políticas (ratelimit por requester, etc.)
         let manifest = Manifest {
             image_cid: offer.manifest_cid.clone(),
             entrypoint: "_start".into(),
@@ -133,21 +138,6 @@ async fn run_daemon(
                 let result = tokio::task::block_in_place(|| {
                     tokio::runtime::Handle::current().block_on(runner.run(manifest))
                 });
-                let success = result.is_ok();
-
-                // Record job outcome in reputation
-                if let Ok(mut rep) = rep_arc.try_write() {
-                    let mut score = rep.get_score(&peer_id_for_handler).cloned().unwrap_or_else(|| {
-                        reputation_engine::ReputationScore::new(&peer_id_for_handler)
-                    });
-                    score.record_job_outcome(success);
-                    rep.apply_events(&[ReputationEvent {
-                        peer_id: peer_id_for_handler.clone(),
-                        timestamp: chrono::Utc::now(),
-                        kind: if success { EventKind::JobSuccess } else { EventKind::JobFailure },
-                    }]);
-                    rep.recompute_all();
-                }
 
                 match result {
                     Ok(run_result) => market_protocol::JobResponse {
