@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">Flovenet</string>
+    <string name="login_title">Flovenet</string>
+    <string name="login_subtitle">Decentralized compute sharing</string>
+    <string name="email_label">Email</string>
+    <string name="password_label">Password</string>
+    <string name="login_button">Sign In</string>
+    <string name="register_button">Create Account</string>
+    <string name="no_account">Don\'t have an account?</string>
+    <string name="has_account">Already have an account?</string>
+    <string name="logout_button">Logout</string>
+    <string name="feed_title">Feed</string>
+    <string name="dashboard_title">Dashboard</string>
+    <string name="profile_title">Profile</string>
+    <string name="post_hint">What\'s happening in the network?</string>
+    <string name="post_button">Post</string>
+</resources>

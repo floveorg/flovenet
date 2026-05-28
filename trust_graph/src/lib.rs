@@ -342,4 +342,84 @@ mod tests {
         let carol_idx = validators.iter().position(|p| p == "carol").unwrap();
         assert!(bob_idx < carol_idx);
     }
+
+    #[test]
+    fn test_trusts_returns_outgoing() {
+        let mut graph = TrustGraph::new();
+        graph.add_edge(make_edge("alice", "bob", 0.7));
+        graph.add_edge(make_edge("alice", "carol", 0.5));
+        let outgoing = graph.trusts("alice");
+        assert_eq!(outgoing.len(), 2);
+        assert!(outgoing.iter().any(|e| e.target == "bob"));
+    }
+
+    #[test]
+    fn test_trusts_nonexistent() {
+        let graph = TrustGraph::new();
+        assert!(graph.trusts("nobody").is_empty());
+        assert!(graph.trusted_by("nobody").is_empty());
+    }
+
+    #[test]
+    fn test_self_trust() {
+        let mut graph = TrustGraph::new();
+        graph.add_edge(make_edge("alice", "alice", 1.0));
+        assert_eq!(graph.edge_count(), 1);
+        assert_eq!(graph.direct_trust("alice", "alice"), 1.0);
+    }
+
+    #[test]
+    fn test_merge_with_empty() {
+        let mut graph = TrustGraph::new();
+        graph.add_edge(make_edge("alice", "bob", 0.8));
+        let empty = TrustGraph::new();
+        graph.merge(&empty);
+        assert_eq!(graph.edge_count(), 1);
+    }
+
+    #[test]
+    fn test_from_edges_roundtrip() {
+        let mut graph = TrustGraph::new();
+        graph.add_edge(make_edge("a", "b", 0.5));
+        graph.add_edge(make_edge("b", "c", 0.9));
+        let edges = graph.to_edges_vec();
+        let restored = TrustGraph::from_edges(edges);
+        assert_eq!(restored.edge_count(), 2);
+        assert_eq!(restored.direct_trust("a", "b"), 0.5);
+    }
+
+    #[test]
+    fn test_select_validators_empty_all_peers() {
+        let graph = TrustGraph::new();
+        let rep = ReputationState::new();
+        let validators = graph.select_validators("alice", &rep, 5, &[]);
+        assert!(validators.is_empty());
+    }
+
+    #[test]
+    fn test_signer_count() {
+        let mut graph = TrustGraph::new();
+        graph.add_edge(make_edge("alice", "bob", 0.5));
+        graph.add_edge(make_edge("alice", "carol", 0.3));
+        graph.add_edge(make_edge("bob", "carol", 0.7));
+        assert_eq!(graph.signer_count(), 2);
+    }
+
+    #[test]
+    fn test_transitive_trust_no_path() {
+        let graph = TrustGraph::new();
+        let trust = graph.transitive_trust("alice", "carol", 2);
+        assert_eq!(trust, 0.0);
+    }
+
+    #[test]
+    fn test_trust_score_combination() {
+        let mut graph = TrustGraph::new();
+        graph.add_edge(make_edge("alice", "bob", 0.6));
+        graph.add_edge(make_edge("bob", "carol", 0.5));
+        let score = graph.trust_score("alice", "carol");
+        // Direct = 0.0, transitive = 0.6 * 0.5 * 0.5 = 0.15
+        // Score = max(0.0, 0.15 * 0.3) = 0.045
+        assert!((score - 0.045).abs() < 0.001);
+    }
 }

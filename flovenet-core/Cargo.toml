@@ -1,0 +1,22 @@
+[package]
+name = "flovenet-core"
+version = "0.1.0"
+edition = "2021"
+description = "Core library for Flovenet P2P compute network - used by desktop and mobile clients"
+
+[lib]
+# cdylib for Android NDK (.so), lib for desktop linking
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tokio.workspace = true
+anyhow.workspace = true
+uuid.workspace = true
+resource_manager = { path = "../resource_manager" }
+dirs.workspace = true
+
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.21"

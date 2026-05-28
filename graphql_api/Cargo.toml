@@ -27,3 +27,6 @@ tower-http = { workspace = true, features = ["cors"] }
 hex.workspace = true
 futures.workspace = true
 async-stream = "0.3"
+
+[dev-dependencies]
+tower.workspace = true

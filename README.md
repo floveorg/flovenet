@@ -47,11 +47,12 @@ Red descentralizada P2P para conectar redes sociales. Infraestructura Rust + lib
                     └─────────────────────┘
 ```
 
-## Workspace (16 crates)
+## Workspace (16 crates funcionales + 2 de test)
 
 ```
 flovenet/
 ├── Cargo.toml               (workspace root)
+├── flovenet-core/           — core multiplataforma (JNI Android)
 ├── daemon/                  — proceso principal (binario)
 ├── cli/                     — CLI con clap
 ├── resource_manager/        — CPU/RAM/GPU/disco
@@ -67,6 +68,8 @@ flovenet/
 ├── trust_graph/             — Web of Trust
 ├── social_protocol/         — Post, Profile, Follow, Feed
 ├── graphql_api/             — async-graphql + axum + WS
+├── test_harness/            — harness de integración
+├── test_reporter/           — reporter de resultados
 ```
 
 ## Uso rápido
@@ -152,7 +155,7 @@ cargo run -- daemon --swarm-key swarm.key
 ## Tests
 
 ```bash
-cargo test        # 65 tests
+cargo test        # ~178 tests
 cargo clippy      # 0 warnings
 cargo fmt         # format
 ```

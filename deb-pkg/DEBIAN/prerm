@@ -1,0 +1,13 @@
+#!/bin/bash
+set -e
+
+case "$1" in
+    remove|purge)
+        systemctl stop flovenet-daemon 2>/dev/null || true
+        systemctl stop flovenet-gateway 2>/dev/null || true
+        systemctl disable flovenet-daemon 2>/dev/null || true
+        systemctl disable flovenet-gateway 2>/dev/null || true
+        ;;
+esac
+
+exit 0

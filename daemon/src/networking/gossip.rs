@@ -68,7 +68,7 @@ pub fn all_topics() -> Vec<Topic> {
 }
 
 /// Module for quick hash used by gossipsub message ID
-mod quickhash {
+pub(crate) mod quickhash {
     pub fn xxh3_64(data: &[u8]) -> u64 {
         let mut h = 0u64;
         for chunk in data.chunks(8) {
@@ -80,5 +80,66 @@ mod quickhash {
             h = h.wrapping_mul(0x9E3779B185EBCA87);
         }
         h
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_topic_names() {
+        assert_eq!(TOPIC_SLOTS_ANNOUNCE, "slots/announce");
+        assert_eq!(TOPIC_NODE_STATUS, "node/status");
+        assert_eq!(TOPIC_REPUTATION, "reputation/score");
+        assert_eq!(TOPIC_TRUST_EDGE, "trust/edge");
+        assert_eq!(TOPIC_SOCIAL_POST, "social/post");
+        assert_eq!(TOPIC_SOCIAL_PROFILE, "social/profile");
+        assert_eq!(TOPIC_SOCIAL_FOLLOW, "social/follow");
+    }
+
+    #[test]
+    fn test_topic_helpers() {
+        assert_eq!(announce_topic().to_string(), TOPIC_SLOTS_ANNOUNCE);
+        assert_eq!(status_topic().to_string(), TOPIC_NODE_STATUS);
+        assert_eq!(reputation_topic().to_string(), TOPIC_REPUTATION);
+        assert_eq!(trust_edge_topic().to_string(), TOPIC_TRUST_EDGE);
+        assert_eq!(social_post_topic().to_string(), TOPIC_SOCIAL_POST);
+        assert_eq!(social_profile_topic().to_string(), TOPIC_SOCIAL_PROFILE);
+        assert_eq!(social_follow_topic().to_string(), TOPIC_SOCIAL_FOLLOW);
+    }
+
+    #[test]
+    fn test_all_topics_contains_all() {
+        let topics = all_topics();
+        assert_eq!(topics.len(), 7);
+        let strings: Vec<String> = topics.into_iter().map(|t| t.to_string()).collect();
+        assert!(strings.contains(&TOPIC_SLOTS_ANNOUNCE.to_string()));
+        assert!(strings.contains(&TOPIC_TRUST_EDGE.to_string()));
+    }
+
+    #[test]
+    fn test_create_gossipsub() {
+        let _behaviour = create_gossipsub();
+        // just ensure it doesn't panic
+    }
+
+    #[test]
+    fn test_xxh3_64_empty() {
+        assert_eq!(quickhash::xxh3_64(b""), 0);
+    }
+
+    #[test]
+    fn test_xxh3_64_consistent() {
+        let a = quickhash::xxh3_64(b"hello world");
+        let b = quickhash::xxh3_64(b"hello world");
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn test_xxh3_64_different_inputs() {
+        let a = quickhash::xxh3_64(b"hello");
+        let b = quickhash::xxh3_64(b"world");
+        assert_ne!(a, b);
     }
 }

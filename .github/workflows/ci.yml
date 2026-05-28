@@ -30,6 +30,64 @@ jobs:
       - name: Test
         run: cargo test
 
+  # Cross-platform build matrix
+  cross-build:
+    strategy:
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+          - x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.target == 'x86_64-pc-windows-msvc' && 'windows-latest' || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: ${{ matrix.target }}
+
+      - name: Build daemon
+        run: cargo build --release --bin daemon --target ${{ matrix.target }}
+
+      - name: Build flovenet-core
+        run: cargo build --release -p flovenet-core --target ${{ matrix.target }}
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: flovenet-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/daemon${{ matrix.target == 'x86_64-pc-windows-msvc' && '.exe' || '' }}
+
+  # Web dashboard build
+  dashboard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build web dashboard
+        run: |
+          cd web-dashboard
+          npm install
+          npm run build
+
+      - name: Upload dashboard
+        uses: actions/upload-artifact@v4
+        with:
+          name: flovenet-dashboard
+          path: web-dashboard/dist/
+
+  # Docker build
+  docker:
+    runs-on: ubuntu-latest
+    needs: [check]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -t flovenet:latest .
+
+  # Security audit
   audit:
     runs-on: ubuntu-latest
     steps:

@@ -12,3 +12,6 @@ wasm_images/*/target
 swarm.key
 pins.json
 flovenet-data/
+target/deb/
+web-dashboard/node_modules/
+web-dashboard/dist/

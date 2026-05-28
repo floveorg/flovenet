@@ -1,0 +1,26 @@
+[Unit]
+Description=Flovenet GraphQL Gateway
+Documentation=https://flovenet.io/docs
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=flovenet
+Group=flovenet
+ExecStart=/usr/bin/flovenet api-gateway --port 8080
+Restart=on-failure
+RestartSec=5
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+# Environment
+Environment=RUST_LOG=info
+Environment=FLOVENET_DATA_DIR=/var/lib/flovenet
+
+[Install]
+WantedBy=multi-user.target

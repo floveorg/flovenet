@@ -1,16 +1,17 @@
 use async_graphql::{Context, Object, SimpleObject, Subscription};
 use chrono::{DateTime, Utc};
 use futures::Stream;
+use serde::{Deserialize, Serialize};
 
 use crate::AppState;
 
-#[derive(SimpleObject, Clone)]
+#[derive(Serialize, Deserialize, SimpleObject, Clone)]
 pub struct AuthPayload {
     pub token: String,
     pub profile: Profile,
 }
 
-#[derive(SimpleObject, Clone)]
+#[derive(Debug, Serialize, Deserialize, SimpleObject, Clone)]
 pub struct Profile {
     pub peer_id: String,
     pub display_name: String,
@@ -22,7 +23,7 @@ pub struct Profile {
     pub reputation: Option<f64>,
 }
 
-#[derive(SimpleObject, Clone)]
+#[derive(Serialize, Deserialize, SimpleObject, Clone)]
 pub struct Post {
     pub cid: String,
     pub author: String,
@@ -35,7 +36,7 @@ pub struct Post {
     pub signature: Vec<u8>,
 }
 
-#[derive(SimpleObject, Clone)]
+#[derive(Debug, Serialize, Deserialize, SimpleObject, Clone)]
 pub struct GatewayInfo {
     pub peer_id: String,
     pub api_url: String,
@@ -45,7 +46,7 @@ pub struct GatewayInfo {
     pub latency_ms: Option<u64>,
 }
 
-#[derive(SimpleObject, Clone)]
+#[derive(Serialize, Deserialize, SimpleObject, Clone)]
 pub struct FeedItem {
     pub post: Post,
     pub author: Profile,
@@ -205,4 +206,98 @@ impl SubscriptionRoot {
 #[derive(Clone)]
 pub enum GatewayEvent {
     NewPost(Post),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_auth_payload_serde() {
+        let p = Profile {
+            peer_id: "peer1".into(),
+            display_name: "Alice".into(),
+            bio: Some("hello".into()),
+            avatar_cid: None,
+            follower_count: 5,
+            following_count: 3,
+            post_count: 10,
+            reputation: Some(100.0),
+        };
+        let payload = AuthPayload {
+            token: "jwt-token".into(),
+            profile: p,
+        };
+        let json = serde_json::to_string(&payload).unwrap();
+        let decoded: AuthPayload = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.token, "jwt-token");
+        assert_eq!(decoded.profile.display_name, "Alice");
+        assert_eq!(decoded.profile.follower_count, 5);
+    }
+
+    #[test]
+    fn test_feed_item_serde() {
+        let post = Post {
+            cid: "cid-1".into(),
+            author: "author-1".into(),
+            content: "content".into(),
+            media: vec!["img.jpg".into()],
+            parent: None,
+            reply_count: 2,
+            like_count: 3,
+            timestamp: chrono::Utc::now(),
+            signature: vec![1, 2, 3],
+        };
+        let author = Profile {
+            peer_id: "author-1".into(),
+            display_name: "Author".into(),
+            bio: None,
+            avatar_cid: None,
+            follower_count: 0,
+            following_count: 0,
+            post_count: 1,
+            reputation: None,
+        };
+        let item = FeedItem { post, author, score: Some(42.5) };
+        let json = serde_json::to_string(&item).unwrap();
+        let decoded: FeedItem = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.post.cid, "cid-1");
+        assert_eq!(decoded.author.display_name, "Author");
+        assert_eq!(decoded.score, Some(42.5));
+    }
+
+    #[test]
+    fn test_gateway_info_serde() {
+        let info = GatewayInfo {
+            peer_id: "pid".into(),
+            api_url: "http://gw:8080".into(),
+            region: "us-east".into(),
+            roles: vec!["compute".into()],
+            reputation_score: 80.0,
+            latency_ms: Some(15),
+        };
+        let json = serde_json::to_string(&info).unwrap();
+        let decoded: GatewayInfo = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.latency_ms, Some(15));
+        assert_eq!(decoded.roles.len(), 1);
+    }
+
+    #[test]
+    fn test_gateway_event_new_post() {
+        let post = Post {
+            cid: "cid-evt".into(),
+            author: "a".into(),
+            content: "event content".into(),
+            media: vec![],
+            parent: None,
+            reply_count: 0,
+            like_count: 0,
+            timestamp: chrono::Utc::now(),
+            signature: vec![],
+        };
+        let event = GatewayEvent::NewPost(post);
+        match event {
+            GatewayEvent::NewPost(p) => assert_eq!(p.cid, "cid-evt"),
+        }
+    }
 }

@@ -3,6 +3,52 @@ pub mod gpu;
 use serde::{Deserialize, Serialize};
 use sysinfo::{Disks, System};
 
+/// Detected operating system / platform identifier.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum Platform {
+    Linux,
+    Windows,
+    Macos,
+    Android,
+    Other(String),
+}
+
+impl Platform {
+    pub fn detect() -> Self {
+        #[cfg(target_os = "linux")]
+        {
+            // Android also reports target_os = "linux" from Rust's perspective
+            // We use an env var set by the JNI bridge to disambiguate
+            if std::env::var("FLOVENET_PLATFORM").as_deref() == Ok("android") {
+                return Platform::Android;
+            }
+            Platform::Linux
+        }
+        #[cfg(target_os = "windows")]
+        {
+            Platform::Windows
+        }
+        #[cfg(target_os = "macos")]
+        {
+            Platform::Macos
+        }
+        #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+        {
+            Platform::Other(std::env::consts::OS.to_string())
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Platform::Linux => "linux",
+            Platform::Windows => "windows",
+            Platform::Macos => "macos",
+            Platform::Android => "android",
+            Platform::Other(_) => "other",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeResources {
     pub cpu_cores: u32,
@@ -14,6 +60,7 @@ pub struct NodeResources {
     pub gpu_vram_gb: Option<f64>,
     pub gpu_model: Option<String>,
     pub uptime_secs: u64,
+    pub platform: Platform,
 }
 
 impl NodeResources {
@@ -52,6 +99,7 @@ impl NodeResources {
             gpu_vram_gb,
             gpu_model,
             uptime_secs: uptime,
+            platform: Platform::detect(),
         }
     }
 }
@@ -123,6 +171,33 @@ impl NodeDescriptor {
     }
 }
 
+/// Returns the platform-appropriate default data directory for Flovenet.
+/// - Linux:   $HOME/.local/share/flovenet  (XDG)
+/// - Windows: %APPDATA%/Flovenet
+/// - macOS:   $HOME/Library/Application Support/Flovenet
+/// - Android: /data/data/com.flovenet.app/files (set via FLOVENET_DATA_DIR env)
+pub fn default_data_dir() -> std::path::PathBuf {
+    if let Ok(dir) = std::env::var("FLOVENET_DATA_DIR") {
+        return std::path::PathBuf::from(dir);
+    }
+    dirs::data_dir()
+        .map(|p| p.join("flovenet"))
+        .unwrap_or_else(|| std::path::PathBuf::from("./flovenet-data"))
+}
+
+/// Returns the platform-appropriate cache directory for Flovenet.
+/// - Linux:   $HOME/.cache/flovenet
+/// - Windows: %LOCALAPPDATA%/Flovenet/cache
+/// - macOS:   $HOME/Library/Caches/Flovenet
+pub fn default_cache_dir() -> std::path::PathBuf {
+    if let Ok(dir) = std::env::var("FLOVENET_CACHE_DIR") {
+        return std::path::PathBuf::from(dir);
+    }
+    dirs::cache_dir()
+        .map(|p| p.join("flovenet"))
+        .unwrap_or_else(|| std::path::PathBuf::from("./flovenet-cache"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -152,6 +227,7 @@ mod tests {
             gpu_vram_gb: None,
             gpu_model: None,
             uptime_secs: 3600,
+            platform: Platform::detect(),
         };
         assert_eq!(NodeDescriptor::slots_for_role(&NodeRole::Compute, &res), 8);
         assert_eq!(NodeDescriptor::slots_for_role(&NodeRole::Social, &res), 1);

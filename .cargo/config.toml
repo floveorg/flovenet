@@ -1,0 +1,26 @@
+# Cross-compilation targets for Flovenet multiplatform builds
+# Install toolchains:
+#   rustup target add x86_64-unknown-linux-gnu
+#   rustup target add x86_64-pc-windows-msvc
+#   rustup target add aarch64-linux-android
+#
+# For Windows: install mingw-w64 or use MSVC toolchain
+# For Android: install Android NDK + cargo-ndk
+
+[build]
+# Target directory for different platforms
+# cargo build --target x86_64-unknown-linux-gnu    # Ubuntu
+# cargo build --target x86_64-pc-windows-msvc      # Windows
+# cargo build --target aarch64-linux-android       # Android
+
+[target.x86_64-unknown-linux-gnu]
+# Default Linux target - no special linker needed
+
+[target.x86_64-pc-windows-msvc]
+# Windows MSVC target
+# Uses rustc's built-in linker on Windows, or set cross-linker on Linux:
+# linker = "x86_64-w64-mingw32-gcc"
+
+[target.aarch64-linux-android]
+# Android ARM64 target via NDK
+linker = "/home/x/android-sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang"

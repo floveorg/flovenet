@@ -44,7 +44,7 @@ fn build_router() -> Router {
 
 async fn run_metrics_server(port: u16) -> anyhow::Result<()> {
     let app = build_router();
-    let addr = SocketAddr::from(([0, 0, 0, 0, 0, 0, 0, 0], port));
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
     tracing::info!("Metrics/API endpoint: http://{addr}");
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
@@ -150,7 +150,7 @@ async fn run_daemon(port: u16, api_port: u16, roles: Vec<NodeRole>, swarm_key_pa
                 }
             }
         }
-    });
+    }).await;
 
     // Metrics server in background
     let metrics_handle = tokio::spawn(async move {

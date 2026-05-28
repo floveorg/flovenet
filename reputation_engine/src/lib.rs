@@ -377,4 +377,95 @@ mod tests {
         score.record_job_outcome(true);
         assert!(score.success_rate > 0.0);
     }
+
+    #[test]
+    fn test_empty_state() {
+        let state = ReputationState::new();
+        assert_eq!(state.peer_count(), 0);
+        assert!(state.leaderboard().is_empty());
+        assert!(state.top_n(5).is_empty());
+        assert!(state.get_score("nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_baseline_with_no_events() {
+        let state = ReputationState::new();
+        // New peer with no events gets the default score
+        let score = ReputationScore::new("newbie");
+        assert_eq!(score.score, 100.0);
+        // Actually add to state and check
+        let score_from_state = state.get_score("newbie");
+        assert!(score_from_state.is_none());
+    }
+
+    #[test]
+    fn test_multiple_bonus_events_accumulate() {
+        let mut state = ReputationState::new();
+        state.apply_events(&[
+            make_event("peer1", EventKind::BonusContent { amount: 25.0 }),
+            make_event("peer1", EventKind::BonusVerification { amount: 15.0 }),
+        ]);
+        state.recompute_score("peer1");
+        let score = state.get_score("peer1").unwrap();
+        assert!((score.bonus - 40.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_consumption_exceeds_contribution() {
+        let mut state = ReputationState::new();
+        state.apply_events(&[
+            make_event("peer1", EventKind::Contribution { hours: 5.0, uptime_pct: 99.0 }),
+            make_event("peer1", EventKind::Consumption { hours: 10.0 }),
+        ]);
+        state.recompute_score("peer1");
+        let score = state.get_score("peer1").unwrap();
+        // Net contribution should be negative
+        assert!(score.net_contribution < 0.0);
+        // Score should be baseline + bonus (no bonus), with 0 net contribution for scoring
+        assert!(score.score >= 50.0);
+        assert!(score.score < 200.0); // should be near baseline
+    }
+
+    #[test]
+    fn test_uptime_update_overwrites() {
+        let mut state = ReputationState::new();
+        state.apply_events(&[
+            make_event("peer1", EventKind::Contribution { hours: 10.0, uptime_pct: 50.0 }),
+        ]);
+        state.apply_events(&[
+            make_event("peer1", EventKind::UptimeUpdate { uptime_pct: 99.0 }),
+        ]);
+        state.recompute_score("peer1");
+        let score = state.get_score("peer1").unwrap();
+        assert!((score.uptime_pct - 99.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_score_never_negative() {
+        let mut score = ReputationScore::new("peer1");
+        score.bonus = -9999.0; // extreme negative bonus
+        let computed = score.compute();
+        assert!(computed >= 0.0);
+    }
+
+    #[test]
+    fn test_merge_keeps_newer() {
+        let mut state_old = ReputationState::new();
+        let old_event = ReputationEvent {
+            peer_id: "peer1".to_string(),
+            timestamp: DateTime::from_timestamp(1000, 0).unwrap(),
+            kind: EventKind::Contribution { hours: 1.0, uptime_pct: 10.0 },
+        };
+        state_old.apply_event(&old_event);
+        state_old.recompute_all();
+
+        let mut state_new = ReputationState::new();
+        state_new.apply_events(&[make_event("peer1", EventKind::Contribution { hours: 99.0, uptime_pct: 99.0 })]);
+        state_new.recompute_all();
+
+        // Old should have its data, new should have newer data
+        state_old.merge(&state_new);
+        let score = state_old.get_score("peer1").unwrap();
+        assert!((score.contribution_hours - 99.0).abs() < 0.001);
+    }
 }

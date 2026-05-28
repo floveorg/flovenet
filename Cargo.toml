@@ -2,6 +2,7 @@
 resolver = "2"
 exclude = ["wasm_images/feed_ranker", "wasm_images/moderator"]
 members = [
+    "flovenet-core",
     "daemon",
     "resource_manager",
     "vm_runtime",
@@ -17,6 +18,8 @@ members = [
     "social_protocol",
     "graphql_api",
     "cli",
+    "test_harness",
+    "test_reporter",
 ]
 
 [workspace.dependencies]
@@ -37,6 +40,7 @@ axum = { version = "0.7", features = ["ws"] }
 prometheus = { version = "0.13", features = ["process"] }
 tower-http = { version = "0.5", features = ["cors"] }
 hyper = { version = "1", features = ["full"] }
+tower = { version = "0.4", features = ["util"] }
 sysinfo = "0.31"
 futures = "0.3"
 uuid = { version = "1", features = ["v4"] }
@@ -53,3 +57,4 @@ zeroize = { version = "1", features = ["derive"] }
 base64 = "0.22"
 async-graphql = { version = "7", features = ["chrono", "playground", "tracing"] }
 jsonwebtoken = "9"
+dirs = "6"

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="background">#0F1117</color>
+    <color name="error">#FF6B6B</color>
+    <color name="primary">#6C5CE7</color>
+    <color name="secondary">#00CEC9</color>
+    <color name="success">#51CF66</color>
+    <color name="surface">#1A1D2E</color>
+    <color name="text">#E4E6F0</color>
+    <color name="textSecondary">#8B8FA3</color>
+    <string name="app_name">Flovenet</string>
+    <string name="dashboard_title">Dashboard</string>
+    <string name="email_label">Email</string>
+    <string name="feed_title">Feed</string>
+    <string name="has_account">Already have an account?</string>
+    <string name="login_button">Sign In</string>
+    <string name="login_subtitle">Decentralized compute sharing</string>
+    <string name="login_title">Flovenet</string>
+    <string name="logout_button">Logout</string>
+    <string name="no_account">Don\'t have an account?</string>
+    <string name="password_label">Password</string>
+    <string name="post_button">Post</string>
+    <string name="post_hint">What\'s happening in the network?</string>
+    <string name="profile_title">Profile</string>
+    <string name="register_button">Create Account</string>
+    <style name="Theme.Flovenet" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">#0F1117</item>
+        <item name="android:navigationBarColor">#0F1117</item>
+        <item name="android:windowBackground">#0F1117</item>
+    </style>
+</resources>

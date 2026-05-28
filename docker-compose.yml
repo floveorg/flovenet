@@ -1,9 +1,7 @@
 services:
   node1:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    command: daemon --port 9091 --api-port 9091 --roles compute,storage
+    image: flovenet:latest
+    command: daemon --port 0 --api-port 9091 --roles compute,storage
     ports:
       - "9091:9091"
     environment:
@@ -12,10 +10,8 @@ services:
       - flovenet
 
   node2:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    command: daemon --port 9092 --api-port 9092 --roles compute
+    image: flovenet:latest
+    command: daemon --port 0 --api-port 9092 --roles compute
     ports:
       - "9092:9092"
     environment:
@@ -24,10 +20,8 @@ services:
       - flovenet
 
   node3:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    command: daemon --port 9093 --api-port 9093 --roles storage
+    image: flovenet:latest
+    command: daemon --port 0 --api-port 9093 --roles storage
     ports:
       - "9093:9093"
     environment:
@@ -36,9 +30,7 @@ services:
       - flovenet
 
   gateway:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: flovenet:latest
     command: api-gateway --port 8080
     ports:
       - "8080:8080"

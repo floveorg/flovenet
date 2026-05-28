@@ -172,4 +172,75 @@ mod tests {
         assert!(!resp.found);
         assert!(resp.data.is_empty());
     }
+
+    #[tokio::test]
+    async fn test_handle_response_caches() {
+        let cache = BlockCache::new(100);
+        let resp = BlockResponse {
+            cid: "new-cid".into(),
+            data: vec![10, 20, 30],
+            found: true,
+        };
+        cache.handle_response(&resp).await;
+        assert!(cache.has_block("new-cid").await);
+    }
+
+    #[tokio::test]
+    async fn test_handle_response_not_found_does_not_cache() {
+        let cache = BlockCache::new(100);
+        let resp = BlockResponse {
+            cid: "not-found".into(),
+            data: vec![],
+            found: false,
+        };
+        cache.handle_response(&resp).await;
+        assert!(!cache.has_block("not-found").await);
+    }
+
+    #[tokio::test]
+    async fn test_duplicate_add_does_not_overflow() {
+        let cache = BlockCache::new(10);
+        for _ in 0..100 {
+            cache.add_block("same-cid").await;
+        }
+        // Should still have just one entry
+        assert_eq!(cache.cache_size().await, 1);
+    }
+
+    #[tokio::test]
+    async fn test_cache_with_zero_max() {
+        let cache = BlockCache::new(0);
+        cache.add_block("a").await;
+        // With max=0, eviction always tries to remove (empty set), then inserts
+        cache.add_block("b").await;
+        // After two inserts, each eviction removes the single element,
+        // so size oscillates. Final size could be 1 or 0 depending on eviction.
+        assert!(cache.cache_size().await <= 1);
+    }
+
+    #[tokio::test]
+    async fn test_get_block_no_storage() {
+        let cache = BlockCache::new(100);
+        cache.add_block("test-cid").await;
+        assert!(cache.has_block("test-cid").await);
+        // Without storage, get_block returns None
+        assert!(cache.get_block("test-cid").await.is_none());
+    }
+
+    #[test]
+    fn test_create_cache_behaviour() {
+        let _behaviour = create_cache_behaviour();
+        // just ensure it doesn't panic
+    }
+
+    #[test]
+    fn test_block_response_found_propagation() {
+        let resp = BlockResponse {
+            cid: "abc".into(),
+            data: vec![1, 2, 3],
+            found: true,
+        };
+        assert!(resp.found);
+        assert_eq!(resp.data.len(), 3);
+    }
 }

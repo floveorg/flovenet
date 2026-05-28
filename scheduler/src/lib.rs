@@ -216,6 +216,7 @@ mod tests {
                 gpu_vram_gb: None,
                 gpu_model: None,
                 uptime_secs: 3600,
+                platform: resource_manager::Platform::detect(),
             },
             region: "us-east".into(),
             api_url: None,
@@ -320,6 +321,7 @@ mod tests {
                 gpu_vram_gb: None,
                 gpu_model: None,
                 uptime_secs: 7200,
+                platform: resource_manager::Platform::detect(),
             },
             region: "us-east".into(),
             api_url: None,
@@ -340,6 +342,7 @@ mod tests {
                 gpu_vram_gb: None,
                 gpu_model: None,
                 uptime_secs: 3600,
+                platform: resource_manager::Platform::detect(),
             },
             region: "us-east".into(),
             api_url: None,
@@ -352,5 +355,135 @@ mod tests {
         // Alice has higher reputation, should be ranked first
         assert_eq!(candidates[0].peer_id, "alice");
         assert!(candidates[0].composite_rank > candidates[1].composite_rank);
+    }
+
+    #[test]
+    fn test_rejects_insufficient_slots() {
+        let scheduler = LocalScheduler::new();
+        let desc = test_descriptor();
+        let req = SlotRequirement {
+            cpu_cores: 999,
+            ram_gb: 1.0,
+            disk_gb: 1.0,
+            gpu_vram_gb: None,
+        };
+        match scheduler.can_accept(&desc, &req, &NodeRole::Compute) {
+            MatchResult::Accepted { .. } => panic!("should reject"),
+            MatchResult::Rejected { reason } => assert!(reason.contains("slots")),
+        }
+    }
+
+    #[test]
+    fn test_rejects_insufficient_disk() {
+        let scheduler = LocalScheduler::new();
+        let desc = test_descriptor();
+        let req = SlotRequirement {
+            cpu_cores: 1,
+            ram_gb: 1.0,
+            disk_gb: 9999.0,
+            gpu_vram_gb: None,
+        };
+        match scheduler.can_accept(&desc, &req, &NodeRole::Compute) {
+            MatchResult::Accepted { .. } => panic!("should reject"),
+            MatchResult::Rejected { reason } => assert!(reason.contains("disk")),
+        }
+    }
+
+    #[test]
+    fn test_rejects_missing_gpu() {
+        let scheduler = LocalScheduler::new();
+        let mut desc = test_descriptor();
+        desc.resources.gpu_vram_gb = None; // no GPU
+        let req = SlotRequirement {
+            cpu_cores: 1,
+            ram_gb: 1.0,
+            disk_gb: 1.0,
+            gpu_vram_gb: Some(8.0),
+        };
+        match scheduler.can_accept(&desc, &req, &NodeRole::Compute) {
+            MatchResult::Accepted { .. } => panic!("should reject"),
+            MatchResult::Rejected { reason } => assert!(reason.contains("GPU")),
+        }
+    }
+
+    #[test]
+    fn test_accepts_with_sufficient_gpu() {
+        let scheduler = LocalScheduler::new();
+        let mut desc = test_descriptor();
+        desc.resources.gpu_vram_gb = Some(24.0);
+        let req = SlotRequirement {
+            cpu_cores: 1,
+            ram_gb: 1.0,
+            disk_gb: 1.0,
+            gpu_vram_gb: Some(8.0),
+        };
+        assert!(matches!(scheduler.can_accept(&desc, &req, &NodeRole::Compute), MatchResult::Accepted { .. }));
+    }
+
+    #[test]
+    fn test_rank_candidates_empty_list() {
+        let scheduler = LocalScheduler::new();
+        let req = SlotRequirement {
+            cpu_cores: 1,
+            ram_gb: 1.0,
+            disk_gb: 1.0,
+            gpu_vram_gb: None,
+        };
+        let candidates = scheduler.rank_candidates(&[], &req, &NodeRole::Compute);
+        assert!(candidates.is_empty());
+    }
+
+    #[test]
+    fn test_rank_candidate_not_resources_ok() {
+        let scheduler = LocalScheduler::new();
+        let req = SlotRequirement {
+            cpu_cores: 999,
+            ram_gb: 1.0,
+            disk_gb: 1.0,
+            gpu_vram_gb: None,
+        };
+        let desc = test_descriptor();
+        let rank = scheduler.rank_candidate(&desc, &req, &NodeRole::Compute).unwrap();
+        assert!(!rank.resources_ok);
+        assert_eq!(rank.composite_rank, 0.0);
+    }
+
+    #[test]
+    fn test_set_and_merge_reputation() {
+        let mut rep = reputation_engine::ReputationState::new();
+        rep.apply_events(&[reputation_engine::ReputationEvent {
+            peer_id: "node1".into(),
+            timestamp: chrono::Utc::now(),
+            kind: reputation_engine::EventKind::Contribution { hours: 10.0, uptime_pct: 99.0 },
+        }]);
+        rep.recompute_all();
+
+        let mut scheduler = LocalScheduler::new();
+        scheduler.set_reputation(rep.clone());
+        assert!(scheduler.reputation().get_score("node1").is_some());
+
+        let mut rep2 = reputation_engine::ReputationState::new();
+        rep2.apply_events(&[reputation_engine::ReputationEvent {
+            peer_id: "node2".into(),
+            timestamp: chrono::Utc::now(),
+            kind: reputation_engine::EventKind::Contribution { hours: 5.0, uptime_pct: 80.0 },
+        }]);
+        rep2.recompute_all();
+
+        scheduler.merge_reputation(&rep2);
+        assert_eq!(scheduler.reputation().peer_count(), 2);
+    }
+
+    #[test]
+    fn test_slot_requirement_serde() {
+        let req = SlotRequirement {
+            cpu_cores: 4,
+            ram_gb: 8.0,
+            disk_gb: 50.0,
+            gpu_vram_gb: Some(16.0),
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        let decoded: SlotRequirement = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.gpu_vram_gb, Some(16.0));
     }
 }

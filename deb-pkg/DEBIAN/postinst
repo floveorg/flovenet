@@ -1,0 +1,30 @@
+#!/bin/bash
+set -e
+
+case "$1" in
+    configure)
+        # Create flovenet user if not exists
+        if ! getent passwd flovenet > /dev/null 2>&1; then
+            useradd --system --no-create-home --home-dir /var/lib/flovenet \
+                --shell /usr/sbin/nologin --comment "Flovenet Node" flovenet
+        fi
+
+        # Create data directories
+        mkdir -p /var/lib/flovenet
+        mkdir -p /var/cache/flovenet
+        chown -R flovenet:flovenet /var/lib/flovenet /var/cache/flovenet
+
+        # Enable and start service
+        systemctl daemon-reload
+        systemctl enable flovenet-daemon
+        systemctl enable flovenet-gateway
+        systemctl start flovenet-daemon || true
+        systemctl start flovenet-gateway || true
+
+        echo "Flovenet installed successfully."
+        echo "  Daemon:  systemctl status flovenet-daemon"
+        echo "  Gateway: systemctl status flovenet-gateway"
+        echo "  Logs:    journalctl -u flovenet-daemon -f"
+        echo "  Dashboard: http://localhost:8080/graphql"
+        ;;
+esac

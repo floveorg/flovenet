@@ -32,3 +32,6 @@ social_protocol = { path = "../social_protocol" }
 graphql_api = { path = "../graphql_api" }
 p2p_cache = { path = "../p2p_cache" }
 chrono.workspace = true
+
+[dev-dependencies]
+tempfile = "3"

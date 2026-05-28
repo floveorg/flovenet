@@ -1,0 +1,12 @@
+target/
+.git/
+*.wasm
+wasm_images/*/target
+.env
+swarm.key
+pins.json
+flovenet-data/
+.github/
+plan.md
+spec_driven_plan.md
+Plan_Integrado_Red_Descentralizada.txt

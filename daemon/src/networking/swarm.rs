@@ -44,11 +44,11 @@ pub struct NodeNetwork {
 }
 
 impl NodeNetwork {
-    pub fn set_job_handler<F>(&mut self, handler: F)
+    pub async fn set_job_handler<F>(&mut self, handler: F)
     where
         F: FnMut(JobOffer) -> JobResponse + Send + 'static,
     {
-        *self.job_handler.blocking_lock() = Some(Box::new(handler));
+        *self.job_handler.lock().await = Some(Box::new(handler));
     }
 }
 

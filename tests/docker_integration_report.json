@@ -1,0 +1,1063 @@
+{
+  "timestamp": "2026-05-24T11:35:15Z",
+  "total_scenarios": 67,
+  "passed_scenarios": 49,
+  "failed_scenarios": 18,
+  "total_checks": 86,
+  "passed_checks": 65,
+  "duration_ms": 4746,
+  "scenarios": [
+    {
+      "name": "gateway_playground",
+      "passed": true,
+      "duration_ms": 64,
+      "checks": [
+        {
+          "name": "http_status",
+          "passed": true,
+          "expected": "200",
+          "actual": "200"
+        },
+        {
+          "name": "has_graphql",
+          "passed": true,
+          "expected": "True",
+          "actual": "True"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "gateway_register_u1",
+      "passed": false,
+      "duration_ms": 115,
+      "checks": [
+        {
+          "name": "token",
+          "passed": true,
+          "expected": "non-empty",
+          "actual": "eyJ0eXAiOiJKV1QiLCJh..."
+        },
+        {
+          "name": "name",
+          "passed": false,
+          "expected": "User One",
+          "actual": "MISSING"
+        },
+        {
+          "name": "peer_id",
+          "passed": false,
+          "expected": "non-empty",
+          "actual": "MISSING..."
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "gateway_login_u1",
+      "passed": true,
+      "duration_ms": 164,
+      "checks": [
+        {
+          "name": "token",
+          "passed": true,
+          "expected": "non-empty",
+          "actual": "eyJ0eXAiOiJKV1QiLCJh..."
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "gateway_login_wrong",
+      "passed": true,
+      "duration_ms": 214,
+      "checks": [
+        {
+          "name": "errors",
+          "passed": true,
+          "expected": "True",
+          "actual": "True"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "gateway_register_dup",
+      "passed": true,
+      "duration_ms": 216,
+      "checks": [
+        {
+          "name": "errors",
+          "passed": true,
+          "expected": "True",
+          "actual": "True"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "gateway_login_nonexistent",
+      "passed": true,
+      "duration_ms": 220,
+      "checks": [
+        {
+          "name": "errors",
+          "passed": true,
+          "expected": "True",
+          "actual": "True"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "gateway_register_u2",
+      "passed": false,
+      "duration_ms": 270,
+      "checks": [
+        {
+          "name": "token",
+          "passed": true,
+          "expected": "non-empty",
+          "actual": "eyJ0eXAiOiJKV1QiLCJh..."
+        },
+        {
+          "name": "name",
+          "passed": false,
+          "expected": "User Two",
+          "actual": "MISSING"
+        },
+        {
+          "name": "peer_id",
+          "passed": false,
+          "expected": "non-empty",
+          "actual": "MISSING..."
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "gateway_register_minimal",
+      "passed": true,
+      "duration_ms": 321,
+      "checks": [
+        {
+          "name": "token",
+          "passed": true,
+          "expected": "non-empty",
+          "actual": "eyJ0eXAiOiJKV1QiLCJh..."
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "gateway_create_post_u1",
+      "passed": true,
+      "duration_ms": 323,
+      "checks": [
+        {
+          "name": "cid",
+          "passed": true,
+          "expected": "non-empty",
+          "actual": "post-0f456d9e-5313-4ec2-8fec-0..."
+        },
+        {
+          "name": "content",
+          "passed": true,
+          "expected": "Post by U1 at 1779622511",
+          "actual": "Post by U1 at 1779622511"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "gateway_create_post_u2",
+      "passed": true,
+      "duration_ms": 324,
+      "checks": [
+        {
+          "name": "cid",
+          "passed": true,
+          "expected": "non-empty",
+          "actual": "post-ce1b842c-d077-479a-859e-8..."
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "gateway_get_feed",
+      "passed": true,
+      "duration_ms": 326,
+      "checks": [
+        {
+          "name": "has_posts",
+          "passed": true,
+          "expected": ">0",
+          "actual": "2"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "gateway_search_posts",
+      "passed": true,
+      "duration_ms": 328,
+      "checks": [
+        {
+          "name": "found",
+          "passed": true,
+          "expected": ">0",
+          "actual": "1"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "gateway_delete_post",
+      "passed": true,
+      "duration_ms": 329,
+      "checks": [
+        {
+          "name": "deleted",
+          "passed": true,
+          "expected": "True",
+          "actual": "True"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "gateway_search_profiles",
+      "passed": true,
+      "duration_ms": 331,
+      "checks": [
+        {
+          "name": "found",
+          "passed": true,
+          "expected": ">0",
+          "actual": "2"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "gateway_get_profile",
+      "passed": true,
+      "duration_ms": 333,
+      "checks": [
+        {
+          "name": "display_name",
+          "passed": true,
+          "expected": "User One",
+          "actual": "User One"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "gateway_follow",
+      "passed": true,
+      "duration_ms": 335,
+      "checks": [
+        {
+          "name": "followed",
+          "passed": true,
+          "expected": "True",
+          "actual": "True"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "gateway_following_list",
+      "passed": true,
+      "duration_ms": 336,
+      "checks": [
+        {
+          "name": "has_following",
+          "passed": true,
+          "expected": ">0",
+          "actual": "1"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "gateway_followers_list",
+      "passed": true,
+      "duration_ms": 338,
+      "checks": [
+        {
+          "name": "has_followers",
+          "passed": true,
+          "expected": ">0",
+          "actual": "1"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "gateway_unfollow",
+      "passed": true,
+      "duration_ms": 340,
+      "checks": [
+        {
+          "name": "unfollowed",
+          "passed": true,
+          "expected": "True",
+          "actual": "True"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "gateway_after_unfollow",
+      "passed": true,
+      "duration_ms": 343,
+      "checks": [
+        {
+          "name": "following_empty",
+          "passed": true,
+          "expected": "0",
+          "actual": "0"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "gateway_update_profile",
+      "passed": false,
+      "duration_ms": 344,
+      "checks": [
+        {
+          "name": "known_bug_returns_error",
+          "passed": false,
+          "expected": "True",
+          "actual": "False"
+        },
+        {
+          "name": "error_message",
+          "passed": false,
+          "expected": "profile not found",
+          "actual": ""
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "gateway_invalid_query",
+      "passed": true,
+      "duration_ms": 346,
+      "checks": [
+        {
+          "name": "errors",
+          "passed": true,
+          "expected": "True",
+          "actual": "True"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "gateway_post_no_auth",
+      "passed": true,
+      "duration_ms": 348,
+      "checks": [
+        {
+          "name": "succeeds_without_auth",
+          "passed": true,
+          "expected": "non-empty",
+          "actual": "post-515a285e-7822-4..."
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "health_node1",
+      "passed": true,
+      "duration_ms": 350,
+      "checks": [
+        {
+          "name": "status",
+          "passed": true,
+          "expected": "200",
+          "actual": "200"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "metrics_node1",
+      "passed": true,
+      "duration_ms": 352,
+      "checks": [
+        {
+          "name": "status",
+          "passed": true,
+          "expected": "200",
+          "actual": "200"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "health_node2",
+      "passed": true,
+      "duration_ms": 353,
+      "checks": [
+        {
+          "name": "status",
+          "passed": true,
+          "expected": "200",
+          "actual": "200"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "metrics_node2",
+      "passed": true,
+      "duration_ms": 356,
+      "checks": [
+        {
+          "name": "status",
+          "passed": true,
+          "expected": "200",
+          "actual": "200"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "health_node3",
+      "passed": true,
+      "duration_ms": 358,
+      "checks": [
+        {
+          "name": "status",
+          "passed": true,
+          "expected": "200",
+          "actual": "200"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "metrics_node3",
+      "passed": true,
+      "duration_ms": 360,
+      "checks": [
+        {
+          "name": "status",
+          "passed": true,
+          "expected": "200",
+          "actual": "200"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "node_status_gateway",
+      "passed": true,
+      "duration_ms": 487,
+      "checks": [
+        {
+          "name": "cpu",
+          "passed": true,
+          "expected": "has CPU",
+          "actual": "cpu=True"
+        },
+        {
+          "name": "ram",
+          "passed": true,
+          "expected": "has RAM",
+          "actual": "ram=True"
+        },
+        {
+          "name": "disk",
+          "passed": true,
+          "expected": "has Disk",
+          "actual": "disk=True"
+        },
+        {
+          "name": "uptime",
+          "passed": true,
+          "expected": "has Uptime",
+          "actual": "uptime=True"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "node_status_node1",
+      "passed": true,
+      "duration_ms": 604,
+      "checks": [
+        {
+          "name": "cpu",
+          "passed": true,
+          "expected": "has CPU",
+          "actual": "cpu=True"
+        },
+        {
+          "name": "ram",
+          "passed": true,
+          "expected": "has RAM",
+          "actual": "ram=True"
+        },
+        {
+          "name": "disk",
+          "passed": true,
+          "expected": "has Disk",
+          "actual": "disk=True"
+        },
+        {
+          "name": "uptime",
+          "passed": true,
+          "expected": "has Uptime",
+          "actual": "uptime=True"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "node_status_node2",
+      "passed": true,
+      "duration_ms": 723,
+      "checks": [
+        {
+          "name": "cpu",
+          "passed": true,
+          "expected": "has CPU",
+          "actual": "cpu=True"
+        },
+        {
+          "name": "ram",
+          "passed": true,
+          "expected": "has RAM",
+          "actual": "ram=True"
+        },
+        {
+          "name": "disk",
+          "passed": true,
+          "expected": "has Disk",
+          "actual": "disk=True"
+        },
+        {
+          "name": "uptime",
+          "passed": true,
+          "expected": "has Uptime",
+          "actual": "uptime=True"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "node_status_node3",
+      "passed": true,
+      "duration_ms": 846,
+      "checks": [
+        {
+          "name": "cpu",
+          "passed": true,
+          "expected": "has CPU",
+          "actual": "cpu=True"
+        },
+        {
+          "name": "ram",
+          "passed": true,
+          "expected": "has RAM",
+          "actual": "ram=True"
+        },
+        {
+          "name": "disk",
+          "passed": true,
+          "expected": "has Disk",
+          "actual": "disk=True"
+        },
+        {
+          "name": "uptime",
+          "passed": true,
+          "expected": "has Uptime",
+          "actual": "uptime=True"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "p2p_listening_gateway",
+      "passed": false,
+      "duration_ms": 960,
+      "checks": [
+        {
+          "name": "listening",
+          "passed": false,
+          "expected": "listening",
+          "actual": "missing"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "p2p_listening_node1",
+      "passed": false,
+      "duration_ms": 1071,
+      "checks": [
+        {
+          "name": "listening",
+          "passed": false,
+          "expected": "listening",
+          "actual": "missing"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "p2p_listening_node2",
+      "passed": false,
+      "duration_ms": 1181,
+      "checks": [
+        {
+          "name": "listening",
+          "passed": false,
+          "expected": "listening",
+          "actual": "missing"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "p2p_listening_node3",
+      "passed": false,
+      "duration_ms": 1310,
+      "checks": [
+        {
+          "name": "listening",
+          "passed": false,
+          "expected": "listening",
+          "actual": "missing"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "cross_tcp_node1\u2192gateway_p2p",
+      "passed": false,
+      "duration_ms": 1422,
+      "checks": [
+        {
+          "name": "reachable",
+          "passed": false,
+          "expected": "True",
+          "actual": "bash: connect: Connection refused\nbash: line 1: /dev/tcp/172.18.0.5/39303: Connection refused\nFAILED"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "cross_tcp_node2\u2192gateway_p2p",
+      "passed": false,
+      "duration_ms": 1532,
+      "checks": [
+        {
+          "name": "reachable",
+          "passed": false,
+          "expected": "True",
+          "actual": "bash: connect: Connection refused\nbash: line 1: /dev/tcp/172.18.0.5/39303: Connection refused\nFAILED"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "cross_tcp_node3\u2192gateway_p2p",
+      "passed": false,
+      "duration_ms": 1643,
+      "checks": [
+        {
+          "name": "reachable",
+          "passed": false,
+          "expected": "True",
+          "actual": "bash: connect: Connection refused\nbash: line 1: /dev/tcp/172.18.0.5/39303: Connection refused\nFAILED"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "cross_tcp_gateway\u2192node1_p2p",
+      "passed": false,
+      "duration_ms": 1761,
+      "checks": [
+        {
+          "name": "reachable",
+          "passed": false,
+          "expected": "True",
+          "actual": "bash: connect: Connection refused\nbash: line 1: /dev/tcp/172.18.0.4/45283: Connection refused\nFAILED"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "cross_tcp_gateway\u2192node2_p2p",
+      "passed": false,
+      "duration_ms": 1899,
+      "checks": [
+        {
+          "name": "reachable",
+          "passed": false,
+          "expected": "True",
+          "actual": "bash: connect: Connection refused\nbash: line 1: /dev/tcp/172.18.0.2/33923: Connection refused\nFAILED"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "cross_tcp_gateway\u2192node3_p2p",
+      "passed": false,
+      "duration_ms": 2013,
+      "checks": [
+        {
+          "name": "reachable",
+          "passed": false,
+          "expected": "True",
+          "actual": "bash: connect: Connection refused\nbash: line 1: /dev/tcp/172.18.0.3/36839: Connection refused\nFAILED"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "cross_tcp_node1\u2192node2_p2p",
+      "passed": false,
+      "duration_ms": 2124,
+      "checks": [
+        {
+          "name": "reachable",
+          "passed": false,
+          "expected": "True",
+          "actual": "bash: connect: Connection refused\nbash: line 1: /dev/tcp/172.18.0.2/33923: Connection refused\nFAILED"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "cross_tcp_node2\u2192node3_p2p",
+      "passed": false,
+      "duration_ms": 2230,
+      "checks": [
+        {
+          "name": "reachable",
+          "passed": false,
+          "expected": "True",
+          "actual": "bash: connect: Connection refused\nbash: line 1: /dev/tcp/172.18.0.3/36839: Connection refused\nFAILED"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "cross_tcp_node3\u2192node1_p2p",
+      "passed": false,
+      "duration_ms": 2330,
+      "checks": [
+        {
+          "name": "reachable",
+          "passed": false,
+          "expected": "True",
+          "actual": "bash: connect: Connection refused\nbash: line 1: /dev/tcp/172.18.0.4/45283: Connection refused\nFAILED"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "cross_tcp_node1\u2192gateway_http",
+      "passed": true,
+      "duration_ms": 2437,
+      "checks": [
+        {
+          "name": "reachable",
+          "passed": true,
+          "expected": "True",
+          "actual": "reachable"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "cross_tcp_gateway\u2192node1_api",
+      "passed": false,
+      "duration_ms": 2550,
+      "checks": [
+        {
+          "name": "reachable",
+          "passed": false,
+          "expected": "True",
+          "actual": "bash: connect: Connection refused\nbash: line 1: /dev/tcp/172.18.0.4/9091: Connection refused\nFAILED"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "cross_tcp_gateway\u2192node2_api",
+      "passed": false,
+      "duration_ms": 2659,
+      "checks": [
+        {
+          "name": "reachable",
+          "passed": false,
+          "expected": "True",
+          "actual": "bash: connect: Connection refused\nbash: line 1: /dev/tcp/172.18.0.2/9092: Connection refused\nFAILED"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "cross_tcp_gateway\u2192node3_api",
+      "passed": true,
+      "duration_ms": 2757,
+      "checks": [
+        {
+          "name": "reachable",
+          "passed": true,
+          "expected": "True",
+          "actual": "reachable"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "dns_gateway\u2192node1",
+      "passed": true,
+      "duration_ms": 2894,
+      "checks": [
+        {
+          "name": "resolved",
+          "passed": true,
+          "expected": "172.18.x.x",
+          "actual": "172.18.0.2"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "dns_gateway\u2192node2",
+      "passed": true,
+      "duration_ms": 3043,
+      "checks": [
+        {
+          "name": "resolved",
+          "passed": true,
+          "expected": "172.18.x.x",
+          "actual": "172.18.0.4"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "dns_gateway\u2192node3",
+      "passed": true,
+      "duration_ms": 3161,
+      "checks": [
+        {
+          "name": "resolved",
+          "passed": true,
+          "expected": "172.18.x.x",
+          "actual": "172.18.0.3"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "dns_node1\u2192gateway",
+      "passed": true,
+      "duration_ms": 3288,
+      "checks": [
+        {
+          "name": "resolved",
+          "passed": true,
+          "expected": "172.18.x.x",
+          "actual": "172.18.0.5"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "dns_node1\u2192node2",
+      "passed": true,
+      "duration_ms": 3395,
+      "checks": [
+        {
+          "name": "resolved",
+          "passed": true,
+          "expected": "172.18.x.x",
+          "actual": "172.18.0.4"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "dns_node2\u2192node3",
+      "passed": true,
+      "duration_ms": 3492,
+      "checks": [
+        {
+          "name": "resolved",
+          "passed": true,
+          "expected": "172.18.x.x",
+          "actual": "172.18.0.3"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "dns_node3\u2192gateway",
+      "passed": true,
+      "duration_ms": 3600,
+      "checks": [
+        {
+          "name": "resolved",
+          "passed": true,
+          "expected": "172.18.x.x",
+          "actual": "172.18.0.5"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "internal_gateway_node1",
+      "passed": true,
+      "duration_ms": 3707,
+      "checks": [
+        {
+          "name": "accessible",
+          "passed": true,
+          "expected": "200",
+          "actual": "200"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "internal_gateway_node2",
+      "passed": true,
+      "duration_ms": 3807,
+      "checks": [
+        {
+          "name": "accessible",
+          "passed": true,
+          "expected": "200",
+          "actual": "200"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "internal_gateway_node3",
+      "passed": true,
+      "duration_ms": 3930,
+      "checks": [
+        {
+          "name": "accessible",
+          "passed": true,
+          "expected": "200",
+          "actual": "200"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "internal_gateway_gateway",
+      "passed": true,
+      "duration_ms": 4056,
+      "checks": [
+        {
+          "name": "accessible",
+          "passed": true,
+          "expected": "200",
+          "actual": "200"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "internal_health_gateway\u2192node1",
+      "passed": true,
+      "duration_ms": 4176,
+      "checks": [
+        {
+          "name": "health",
+          "passed": true,
+          "expected": "ok",
+          "actual": "ok"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "internal_health_gateway\u2192node2",
+      "passed": true,
+      "duration_ms": 4288,
+      "checks": [
+        {
+          "name": "health",
+          "passed": true,
+          "expected": "ok",
+          "actual": "ok"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "internal_health_gateway\u2192node3",
+      "passed": true,
+      "duration_ms": 4402,
+      "checks": [
+        {
+          "name": "health",
+          "passed": true,
+          "expected": "ok",
+          "actual": "ok"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "internal_health_node1\u2192node2",
+      "passed": true,
+      "duration_ms": 4509,
+      "checks": [
+        {
+          "name": "health",
+          "passed": true,
+          "expected": "ok",
+          "actual": "ok"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "internal_health_node2\u2192node3",
+      "passed": true,
+      "duration_ms": 4630,
+      "checks": [
+        {
+          "name": "health",
+          "passed": true,
+          "expected": "ok",
+          "actual": "ok"
+        }
+      ],
+      "error": null
+    },
+    {
+      "name": "internal_health_node3\u2192node1",
+      "passed": true,
+      "duration_ms": 4746,
+      "checks": [
+        {
+          "name": "health",
+          "passed": true,
+          "expected": "ok",
+          "actual": "ok"
+        }
+      ],
+      "error": null
+    }
+  ]
+}

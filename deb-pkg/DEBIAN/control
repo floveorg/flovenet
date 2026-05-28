@@ -1,0 +1,16 @@
+Package: flovenet
+Version: 0.1.0
+Section: net
+Priority: optional
+Architecture: amd64
+Essential: no
+Maintainer: Flovenet Team <dev@flovenet.io>
+Homepage: https://flovenet.io
+Description: Decentralized compute sharing network
+ Flovenet is a P2P network for sharing computing resources
+ (CPU, RAM, GPU, storage) across devices. It supports WASM
+ job execution, social features, and a reputation system.
+ .
+ This package installs the flovenet daemon and API gateway,
+ along with systemd service files for automatic startup.
+Depends: libssl3, ca-certificates, libc6 (>= 2.31)

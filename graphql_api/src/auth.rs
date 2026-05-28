@@ -113,3 +113,71 @@ impl AuthManager {
             .map_err(|e| format!("token generation error: {e}"))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_auth() -> AuthManager {
+        AuthManager::new("test-secret-1234567890")
+    }
+
+    #[tokio::test]
+    async fn test_register_and_login() {
+        let auth = make_auth();
+        let token = auth.register("alice@test.com", "pass123", "Alice", vec![1, 2, 3]).await.unwrap();
+        assert!(!token.is_empty());
+
+        let (token2, user) = auth.login("alice@test.com", "pass123").await.unwrap();
+        assert_eq!(user.email, "alice@test.com");
+        assert_eq!(user.display_name, "Alice");
+        assert!(!token2.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_register_duplicate_email() {
+        let auth = make_auth();
+        auth.register("dup@test.com", "pass1", "Dup", vec![]).await.unwrap();
+        let err = auth.register("dup@test.com", "pass2", "Dup2", vec![]).await.unwrap_err();
+        assert_eq!(err, "email already registered");
+    }
+
+    #[tokio::test]
+    async fn test_login_wrong_password() {
+        let auth = make_auth();
+        auth.register("bob@test.com", "correct", "Bob", vec![4, 5, 6]).await.unwrap();
+        let err = auth.login("bob@test.com", "wrong").await.unwrap_err();
+        assert_eq!(err, "invalid email or password");
+    }
+
+    #[tokio::test]
+    async fn test_login_nonexistent_user() {
+        let auth = make_auth();
+        let err = auth.login("nobody@test.com", "x").await.unwrap_err();
+        assert_eq!(err, "invalid email or password");
+    }
+
+    #[tokio::test]
+    async fn test_validate_token() {
+        let auth = make_auth();
+        let token = auth.register("val@test.com", "pwd", "Val", vec![7, 8, 9]).await.unwrap();
+        let claims = auth.validate_token(&token).await.unwrap();
+        assert_eq!(claims.email, "val@test.com");
+        assert!(claims.exp > claims.iat);
+    }
+
+    #[tokio::test]
+    async fn test_validate_token_invalid() {
+        let auth = make_auth();
+        let err = auth.validate_token("badtoken").await.unwrap_err();
+        assert!(err.contains("invalid token"));
+    }
+
+    #[tokio::test]
+    async fn test_register_generates_different_tokens() {
+        let auth = make_auth();
+        let t1 = auth.register("a@test.com", "pwd", "A", vec![]).await.unwrap();
+        let t2 = auth.register("b@test.com", "pwd", "B", vec![]).await.unwrap();
+        assert_ne!(t1, t2);
+    }
+}

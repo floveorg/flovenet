@@ -1,0 +1,26 @@
+R_DEF: Internal format may change without notice
+local
+color background
+color error
+color primary
+color secondary
+color success
+color surface
+color text
+color textSecondary
+string app_name
+string dashboard_title
+string email_label
+string feed_title
+string has_account
+string login_button
+string login_subtitle
+string login_title
+string logout_button
+string no_account
+string password_label
+string post_button
+string post_hint
+string profile_title
+string register_button
+style Theme.Flovenet
