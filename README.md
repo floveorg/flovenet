@@ -7,7 +7,7 @@ Red descentralizada P2P para conectar redes sociales. Infraestructura Rust + lib
 | Capa | Tecnología |
 |------|-----------|
 | Lenguaje | Rust (edition 2021) |
-| Networking | libp2p 0.54 (TCP + Noise + Yamux + Kademlia + Gossipsub + Identify + Ping) |
+| Networking | libp2p 0.54 (TCP + Noise + Yamux + Kademlia + Gossipsub + Identify + Ping + **mDNS**) |
 | Ejecución | Wasmtime 24 (WASI preview1) |
 | Almacenamiento | LocalBackend → IpfsBackend (Kubo) → S3Backend (MinIO; AWS via Basic auth → no SigV4) → HybridBackend |
 | API | async-graphql + axum (HTTP POST + playground; **WebSocket no expuesto todavía**) |
@@ -111,8 +111,12 @@ cargo run --release -- status
 # Compartir recursos como nodo compute
 cargo run --release -- share --role compute
 
-# Iniciar daemon completo
+# Iniciar daemon completo (mDNS descubre peers en la misma LAN/bridge)
 cargo run --release -- daemon --port 0 --api-port 9090 --roles compute,storage
+
+# Daemon con bootstrap explícito (multiaddr con o sin /p2p/<id>)
+cargo run --release -- daemon --port 0 --api-port 9092 \
+  --bootstrap-peers /dns4/node1/tcp/4001
 
 # Iniciar gateway GraphQL
 cargo run --release -- api-gateway --port 8080
@@ -260,6 +264,11 @@ auditoría al revisar `daemon/src/networking/`, `graphql_api/src/lib.rs`,
     compose bridge se ven todos contra todos. Combinación
     `--bootstrap-peers /dns4/node1/tcp/4001` + mDNS verificada.
   - Tests unitarios cli+daemon: 17/17 ok.
+- 2026-05-28 — **Hito 0.2** (TrustEdge signature verify) + **Hito 0.3**
+  (reputación atribuida al provider por el requester):
+  - `cargo test --workspace --release` → todos los crates green
+    (`trust_graph` 23/23 con 6 nuevos tests de firma).
+  - Docker compose retest tras los cambios → matriz N×N sigue PASS.
 - Para iterar rápido en local: `Dockerfile.fast` reusa `target/release/daemon`
   del host (Ubuntu 24.04 base, glibc 2.39). El `Dockerfile` canónico
   (cargo-chef multi-stage) sigue siendo el de CI/release.
@@ -267,7 +276,12 @@ auditoría al revisar `daemon/src/networking/`, `graphql_api/src/lib.rs`,
 ## Tests
 
 ```bash
-cargo test        # ~178 tests
-cargo clippy      # 0 warnings
-cargo fmt         # format
+cargo test --workspace --release
+cargo clippy --all-targets -- -D warnings
+cargo fmt --all -- --check
+
+# Tests pragmáticos de red (requieren target/release/daemon)
+.work/test-discovery.sh    # 3 daemons locales con mDNS
+docker build -f Dockerfile.fast -t flovenet:latest .
+.work/test-docker.sh       # 3 nodos + gateway en docker compose
 ```
