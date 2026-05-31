@@ -8,6 +8,8 @@ cargo fmt --check
 cargo clippy --all-targets -- -D warnings
 cargo build --release
 cargo test
+cargo audit
+cargo deny check
 
 # Solo un crate
 cargo test -p crypto
@@ -31,6 +33,7 @@ Un solo binario (`daemon`) con subcomandos definidos en `cli/src/lib.rs` (clap d
 
 ## Quirks importantes
 
+- **CI jobs**: `check` (fmt+clippy+build+test), `cross-build`, `dashboard`, `deb-package`, `docker`, `audit`, `deny`. El `check` corre primero; `deb-package` y `docker` dependen de él.
 - **`updateProfile` siempre falla** — el store interno usa key "user" que no existe. No tocar sin rediseñar el auth middleware.
 - **No hay auth middleware real** — `createPost` y otras mutaciones funcionan sin token JWT.
 - **GraphQL gateway guarda todo en `InMemoryStore`** — se pierde al reiniciar.
@@ -39,6 +42,11 @@ Un solo binario (`daemon`) con subcomandos definidos en `cli/src/lib.rs` (clap d
 - **Android**: `flovenet-core` es `cdylib` + `lib`, compila con `cargo build --target aarch64-linux-android -p flovenet-core --release`, requiere NDK 27+.
 - **WASM images** (`wasm_images/feed_ranker`, `wasm_images/moderator`) están excluidas del workspace.
 - **Tests de integración Docker**: `tests/docker_integration_test.py` — requiere `docker compose up --build` primero.
+- **graphql-codegen@0.0.0** no existe en npm. Estaba como placeholder, ya removido de package.json.
+- **`cargo-audit` y `cargo-deny`** tienen configuraciones separadas (`.cargo/audit.toml` y `deny.toml`). Ambos ignoran advisories de dependencias transitivas (libp2p, wasmtime) que no podemos actualizar.
+- **`cargo-deny`** no acepta expresiones SPDX como `"Apache-2.0 OR MIT"`. Listar licencias individuales.
+- **Rama remota** es `master`, no `main`. CI configurado para `master`.
+- **Windows cross-build** compila `daemon` y `flovenet-core` para `x86_64-pc-windows-msvc`. Errores de clippy/compilación específicos de Windows (como `std::path::Path` no usado ahí) pueden aparecer.
 
 ## Estructura
 
