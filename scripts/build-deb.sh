@@ -2,39 +2,58 @@
 set -euo pipefail
 
 # Build Flovenet .deb package
-# Usage: ./scripts/build-deb.sh [version]
+# Usage: ./scripts/build-deb.sh [version] [arch]
+#   version: from Cargo.toml by default
+#   arch:    amd64 (default) | arm64
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-VERSION="${1:-$(cd "$PROJECT_DIR" && grep '^version =' Cargo.toml | head -1 | cut -d'"' -f2)}"
-DEB_DIR="$PROJECT_DIR/deb-pkg"
-BUILD_DIR="$PROJECT_DIR/target/deb"
+VERSION="${1:-$(cd "$PROJECT_DIR" && grep '^version =' daemon/Cargo.toml | head -1 | cut -d'"' -f2)}"
+ARCH="${2:-amd64}"
 
-echo "==> Building flovenet v$VERSION .deb package"
+case "$ARCH" in
+  amd64) RUST_TARGET="x86_64-unknown-linux-gnu"; DEB_ARCH="amd64" ;;
+  arm64) RUST_TARGET="aarch64-unknown-linux-gnu"; DEB_ARCH="arm64" ;;
+  *) echo "Unsupported arch: $ARCH (use amd64 or arm64)"; exit 1 ;;
+esac
+
+DEB_DIR="$PROJECT_DIR/deb-pkg"
+BUILD_DIR="$PROJECT_DIR/target/deb-build"
+
+echo "==> Building flovenet v$VERSION .deb package ($DEB_ARCH)"
 
 # Step 1: Build the release binary
-echo "==> Compiling flovenet daemon..."
+echo "==> Compiling flovenet daemon (target: $RUST_TARGET)..."
 cd "$PROJECT_DIR"
-cargo build --release --bin daemon
+cargo build --release --bin daemon --target "$RUST_TARGET"
 
 # Step 2: Prepare deb directory
 echo "==> Preparing package structure..."
 rm -rf "$BUILD_DIR"
-PKG_DIR="$BUILD_DIR/flovenet_${VERSION}_amd64"
-mkdir -p "$PKG_DIR"
+PKG_DIR="$BUILD_DIR/flovenet_${VERSION}_${DEB_ARCH}"
+mkdir -p "$PKG_DIR/DEBIAN"
+mkdir -p "$PKG_DIR/usr/bin"
+mkdir -p "$PKG_DIR/usr/share/doc/flovenet"
+mkdir -p "$PKG_DIR/usr/share/man/man1"
+mkdir -p "$PKG_DIR/lib/systemd/system"
 
-# Step 3: Copy control files
-cp -r "$DEB_DIR/DEBIAN" "$PKG_DIR/"
-cp -r "$DEB_DIR/lib" "$PKG_DIR/"
-
-# Step 4: Copy binary
-cp "$PROJECT_DIR/target/release/daemon" "$PKG_DIR/usr/bin/flovenet"
+# Step 3: Copy binary
+cp "target/$RUST_TARGET/release/daemon" "$PKG_DIR/usr/bin/flovenet"
 strip "$PKG_DIR/usr/bin/flovenet" 2>/dev/null || true
 
-# Step 5: Copy docs
+# Step 4: Copy control files
+cp "$DEB_DIR/DEBIAN/control" "$PKG_DIR/DEBIAN/"
+cp "$DEB_DIR/DEBIAN/postinst" "$PKG_DIR/DEBIAN/"
+cp "$DEB_DIR/DEBIAN/prerm" "$PKG_DIR/DEBIAN/"
+chmod 755 "$PKG_DIR/DEBIAN/postinst" "$PKG_DIR/DEBIAN/prerm"
+
+# Step 5: Copy systemd services
+cp "$DEB_DIR/lib/systemd/system/"*.service "$PKG_DIR/lib/systemd/system/"
+
+# Step 6: Copy docs
 cp "$PROJECT_DIR/README.md" "$PKG_DIR/usr/share/doc/flovenet/"
 
-# Step 6: Generate man page
+# Step 7: Generate man page
 cat > "$PKG_DIR/usr/share/man/man1/flovenet.1" << 'MANEOF'
 .TH FLOVENET 1 "2026" "Flovenet" "User Commands"
 .SH NAME
@@ -63,13 +82,14 @@ Display node resource information.
 MANEOF
 gzip -9 "$PKG_DIR/usr/share/man/man1/flovenet.1"
 
-# Step 7: Update version in control file
+# Step 8: Update metadata
 sed -i "s/Version: .*/Version: $VERSION/" "$PKG_DIR/DEBIAN/control"
+sed -i "s/Architecture: .*/Architecture: $DEB_ARCH/" "$PKG_DIR/DEBIAN/control"
 
-# Step 8: Build .deb
+# Step 9: Build .deb
 echo "==> Building .deb package..."
-fakeroot dpkg-deb --build "$PKG_DIR" "$PROJECT_DIR/target/flovenet_${VERSION}_amd64.deb"
+fakeroot dpkg-deb --build "$PKG_DIR" "$PROJECT_DIR/target/flovenet_${VERSION}_${DEB_ARCH}.deb"
 
 echo "==> Done!"
-echo "    Package: $PROJECT_DIR/target/flovenet_${VERSION}_amd64.deb"
-echo "    Install: sudo dpkg -i target/flovenet_${VERSION}_amd64.deb"
+echo "    Package: $PROJECT_DIR/target/flovenet_${VERSION}_${DEB_ARCH}.deb"
+echo "    Install: sudo dpkg -i target/flovenet_${VERSION}_${DEB_ARCH}.deb"

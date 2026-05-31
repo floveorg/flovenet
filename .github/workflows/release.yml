@@ -1,0 +1,24 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Install packaging tools
+        run: sudo apt-get update && sudo apt-get install -y fakeroot dpkg-dev
+
+      - name: Build .deb package
+        run: bash scripts/build-deb.sh
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: target/flovenet_*.deb
+          generate_release_notes: true
