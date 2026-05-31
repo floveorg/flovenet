@@ -149,7 +149,10 @@ fn detect_gpu_platform() -> (Option<f64>, Option<String>) {
 fn detect_gpu_platform() -> (Option<f64>, Option<String>) {
     // Windows GPU detection via nvidia-smi subprocess (lightweight, no NVML binding needed)
     match std::process::Command::new("nvidia-smi")
-        .args(["--query-gpu=memory.total,name", "--format=csv,noheader,nounits"])
+        .args([
+            "--query-gpu=memory.total,name",
+            "--format=csv,noheader,nounits",
+        ])
         .output()
     {
         Ok(output) if output.status.success() => {
@@ -168,7 +171,13 @@ fn detect_gpu_platform() -> (Option<f64>, Option<String>) {
         _ => {
             // Fallback: try WMI (Windows Management Instrumentation)
             match std::process::Command::new("wmic")
-                .args(["path", "Win32_VideoController", "get", "AdapterRAM,Name", "/format:csv"])
+                .args([
+                    "path",
+                    "Win32_VideoController",
+                    "get",
+                    "AdapterRAM,Name",
+                    "/format:csv",
+                ])
                 .output()
             {
                 Ok(output) if output.status.success() => {
