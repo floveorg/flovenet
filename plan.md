@@ -1,129 +1,105 @@
-# Plan de Pruebas — Flovenet en nodo1
+# Plan de pruebas de red reales
 
-## Stack instalado
+## Diagnóstico
 
-| Componente | Versión |
-|------------|---------|
-| Rust | 1.96.0 |
-| Docker | 29.5.2 |
-| Docker Compose | v5.1.4 |
-| SO | Ubuntu 26.04 LTS x86_64 |
-| Binario | `target/release/daemon` |
+### ✅ Lo que ya funciona
 
----
+- **178 unit tests** en 26 crates (`cargo test`)
+- **P2P gossipsub local** — `test_p2p_gossip_message_exchange` intercambia mensajes entre 2 nodos en localhost
+- **test_harness** (`flovenet-test`) — 3 escenarios: mesh de N nodos, gossip propagation, mensajes secuenciales. Corre en localhost sin Docker
+- **test_reporter** (`flovenet-report`) — formatea resultados de tests (terminal/markdown/json)
+- **GraphQL API** en gateway — playground, register, login, createPost, feed, follow
 
-## Paso 1 — Daemon P2P (nodo individual)
+### ⚠️ Docker integration test (parcial)
 
-```bash
-./target/release/daemon daemon --port 0 --api-port 9091 --roles compute,storage
-```
+`tests/docker_integration_test.py` corre contra 4 containers. Último reporte:
+**49/67 scenarios pasaron, 18 fallaron**
 
-- Escucha en puerto aleatorio libp2p
-- API HTTP en `http://localhost:9091`
-- Roles: compute (CPU/RAM) + storage (disco)
+| Falla | Causa raíz |
+|-------|-----------|
+| `gateway_register_u1` missing fields | Helper `GF()` no navega correctamente en response anidado (`register.profile.displayName`) |
+| `p2p_listening_*` | `--port 0` = puerto aleatorio, `/proc/net/tcp` nunca los encuentra |
+| `cross_tcp_*_p2p` | Misma causa: puertos P2P no existen donde se esperan |
+| `updateProfile` | Bug conocido: mutations hardcodean `user_id = "user"`, funciona post-register pero falla si no hay perfil |
+| `gateway→node1_api` timeout | Containers no alcanzan a inicializar antes del test |
 
----
+### ❌ Lo que no funciona / no existe
 
-## Paso 2 — Gateway GraphQL
-
-```bash
-# Terminal 2
-./target/release/daemon api-gateway --port 8080
-```
-
-- Abrir `http://localhost:8080/graphql` (playground)
-- Probar queries/mutations:
-
-```graphql
-# Registro
-mutation {
-  register(email: "test@x.com", password: "1234", displayName: "Nodo1") {
-    token
-    profile { peerId }
-  }
-}
-
-# Crear post
-mutation {
-  createPost(content: "Hola desde nodo1") { cid content timestamp }
-}
-
-# Feed
-query {
-  feed(limit: 10) {
-    post { content author }
-    author { displayName }
-  }
-}
-
-# Subscripción nuevos posts
-subscription {
-  newPosts { cid content author }
-}
-```
+- **PSK a nivel transporte**: `build_transport()` log warning — swarm.key no cifra realmente
+- **Sin discovery**: Kademlia se crea pero `bootstrap_kademlia()` nunca se llama. Nodos no se encuentran
+- **Job market sin descubrimiento**: No hay forma de saber qué nodos existen
+- **InMemoryStore volátil**: GraphQL pierde estado al reiniciar
+- **Auth ficticio**: `createPost`, `follow`, etc. hardcodean `user_id = "user"`
+- **docker CI job nunca corre**: Condición `github.ref == 'refs/heads/main'` pero rama es `master`
+- **Sin tests de frontend web**
 
 ---
 
-## Paso 3 — Red multi-nodo con Docker Compose
+## Roadmap
+
+### Fase 1 — Arreglar infraestructura Docker
+
+| Acción | Archivo | Dificultad |
+|--------|---------|-----------|
+| Puertos fijos en docker-compose (cambiar `--port 0` a `--port 9091`, etc.) | `docker-compose.yml` | Trivial |
+| Healthchecks para esperar inicialización | `docker-compose.yml` | Trivial |
+| Build y verify local | `Dockerfile` | Trivial |
+
+### Fase 2 — Arreglar CI
+
+| Acción | Archivo | Dificultad |
+|--------|---------|-----------|
+| Docker job: cambiar `main` → `master` | `.github/workflows/ci.yml` | Trivial |
+| Agregar job `p2p-test` que corra `flovenet-test` | `.github/workflows/ci.yml` | Baja |
+| Opcional: job `integration-test` con docker compose | `.github/workflows/ci.yml` | Media |
+
+### Fase 3 — Arreglar docker_integration_test.py
+
+| Acción | Dificultad |
+|--------|-----------|
+| Arreglar helper `GF()` para response anidados | Baja |
+| Agregar `retry` / `wait_for_healthy()` antes de cada sección | Baja |
+| Arreglar búsqueda de puertos P2P (leer logs o usar puertos fijos) | Baja |
+| Marcar `updateProfile` como expected failure con comentario claro | Trivial |
+
+### Fase 4 — Mejorar test_harness (opcional pero recomendado)
+
+| Escenario | Prioridad |
+|-----------|-----------|
+| `p2p_job_offer` — oferta de trabajo entre 2 nodos | Alta |
+| `p2p_block_exchange` — intercambio de bloques | Alta |
+| `p2p_reputation_sync` — reputación vía gossipsub | Media |
+| `multi_hop_gossip` — 4 nodos en cadena | Media |
+| `p2p_discovery` — Kademlia bootstrap + find_node | Alta (habilita red real) |
+
+### Fase 5 — Features para red usable (más adelante)
+
+| Feature | Esfuerzo |
+|---------|----------|
+| mdns o relay para descubrimiento automático | Alta |
+| LocalBackend persistente para gateway | Media |
+| Auth middleware real (validar JWT en mutations) | Media |
+| PSK real a nivel transporte | Baja (ya hay infraestructura) |
+| CI con Docker integration test automático | Media |
+
+---
+
+## Uso rápido
 
 ```bash
+# Build local
+docker build -t flovenet:latest .
+
+# Docker compose con 3 nodos + gateway
 docker compose up --build
-```
 
-Lanza 4 servicios:
-- `node1` — daemon (compute+storage, puerto 9091)
-- `node2` — daemon (compute, puerto 9092)
-- `node3` — daemon (storage, puerto 9093)
-- `gateway` — GraphQL API (puerto 8080)
+# test_harness nativo
+cargo run -p test_harness -- --scenarios all -o report.json
+cargo run -p test_reporter -- report.json -f terminal
 
-Probar descubrimiento P2P entre nodos.
-
----
-
-## Paso 4 — Ejecución WASM local
-
-```bash
-./target/release/daemon run --manifest _start --image wasm_images/feed_ranker.wasm
-```
-
-Requiere wasmtime 24 (incluido en binario).
-
----
-
-## Paso 5 — Sub-red privada (PSK)
-
-```bash
-dd if=/dev/urandom bs=32 count=1 of=swarm.key
-./target/release/daemon daemon --swarm-key swarm.key --api-port 9094
-```
-
----
-
-## Paso 6 — Empaquetar .deb local
-
-```bash
-./scripts/build-deb.sh 0.1.0 amd64
-sudo dpkg -i target/flovenet_0.1.0_amd64.deb
-systemctl status flovenet-daemon
-journalctl -u flovenet-daemon -f
-```
-
----
-
-## Paso 7 — Release CI/CD (GitHub Actions)
-
-Archivo: `.github/workflows/release.yml`
-
-**Trigger**: push tag `v*`
-
-**Jobs**:
-- `build-deb (amd64)` — ubuntu-24.04, target x86_64
-- `build-deb (arm64)` — ubuntu-24.04-arm, target aarch64
-- `create-release` — junta artifacts + SHA256 checksums + crea GitHub Release
-
-**Para lanzar un release**:
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-# GitHub Actions produce .deb amd64 + arm64 en releases
+# Prueba manual
+# Terminal 1: Gateway
+cargo run -- api-gateway --port 8080
+# Terminal 2: Nodo
+cargo run -- daemon --port 9091 --api-port 9092 --roles compute,storage
 ```

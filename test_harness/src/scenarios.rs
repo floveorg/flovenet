@@ -1,12 +1,10 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use libp2p::gossipsub;
 use libp2p::swarm::SwarmEvent;
 use tracing::info;
 
-use test_harness::{
-    wait_for_event, Scenario, ScenarioResult, TestCheck, TestNode, TestOrchestrator,
-};
+use test_harness::{Scenario, ScenarioResult, TestCheck, TestNode, TestOrchestrator};
 
 // ── Scenario 1: P2P Mesh Formation ─────────────────────────
 
@@ -26,9 +24,8 @@ impl Scenario for P2pMeshScenario {
 
         info!("Creating {count} P2P nodes...", count = self.node_count);
         for i in 0..self.node_count {
-            let port = 21000 + i as u16;
-            let node = TestNode::new(port);
-            info!("  Node {i}: {} on port {port}", node.peer_id_str());
+            let node = TestNode::new().await;
+            info!("  Node {i}: {} on {}", node.peer_id_str(), node.listen_addr);
             orch.add_node(node).await;
         }
 
@@ -76,9 +73,8 @@ impl Scenario for GossipPropagationScenario {
         let topic = gossipsub::IdentTopic::new(&self.topic);
 
         // Create 3 nodes, subscribe to topic
-        for i in 0..3 {
-            let port = 22000 + i as u16;
-            let mut node = TestNode::new(port);
+        for _ in 0..3 {
+            let mut node = TestNode::new().await;
             node.subscribe(&topic);
             orch.add_node(node).await;
         }
@@ -92,17 +88,35 @@ impl Scenario for GossipPropagationScenario {
             info!("Publishing '{}' on topic '{}'", self.message, self.topic);
             nodes[0].publish(&topic, self.message.as_bytes());
         }
-        tokio::time::sleep(Duration::from_millis(1000)).await;
 
-        // Check node 1 received the message
-        let mut nodes = orch.nodes.lock().await;
-        let received1 = wait_for_event(
-            &mut nodes[1].swarm,
-            |e| matches!(e, SwarmEvent::Behaviour(gossipsub::Event::Message { .. })),
-            2000,
-        )
-        .await;
-        drop(nodes);
+        // Poll ALL swarms concurrently until node 1 receives the message.
+        // (Only polling the receiver would prevent the sender from actually sending.)
+        use futures::StreamExt;
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let mut received1 = false;
+        loop {
+            if Instant::now() > deadline {
+                break;
+            }
+            let mut nodes = orch.nodes.lock().await;
+            for node in nodes.iter_mut() {
+                tokio::select! {
+                    event = node.swarm.next() => {
+                        if let Some(SwarmEvent::Behaviour(gossipsub::Event::Message { .. })) = event {
+                            received1 = true;
+                        }
+                    }
+                    _ = tokio::time::sleep(Duration::from_millis(10)) => {}
+                }
+                if received1 {
+                    break;
+                }
+            }
+            drop(nodes);
+            if received1 {
+                break;
+            }
+        }
 
         checks.push(TestCheck::new(
             "gossip_node1",
@@ -143,9 +157,8 @@ impl Scenario for SequentialMessagesScenario {
         let topic = gossipsub::IdentTopic::new("test/seq");
 
         // Create 2 nodes
-        for i in 0..2 {
-            let port = 23000 + i as u16;
-            let mut node = TestNode::new(port);
+        for _ in 0..2 {
+            let mut node = TestNode::new().await;
             node.subscribe(&topic);
             orch.add_node(node).await;
         }
@@ -162,21 +175,37 @@ impl Scenario for SequentialMessagesScenario {
             tokio::time::sleep(Duration::from_millis(400)).await;
         }
 
-        // Collect received messages on node 1
-        let mut received: Vec<String> = Vec::new();
-        let mut nodes = orch.nodes.lock().await;
+        // Poll ALL swarms concurrently to collect messages.
+        // (Only polling the receiver would prevent the sender from sending.)
         use futures::StreamExt;
-        for _ in 0..500 {
-            tokio::select! {
-                event = nodes[1].swarm.next() => {
-                    if let Some(SwarmEvent::Behaviour(gossipsub::Event::Message { message, .. })) = event {
-                        received.push(String::from_utf8_lossy(&message.data).to_string());
-                    }
-                }
-                _ = tokio::time::sleep(Duration::from_millis(10)) => {}
+        let mut received: Vec<String> = Vec::new();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        'collect: loop {
+            if Instant::now() > deadline {
+                break;
             }
+            if received.len() >= messages.len() {
+                break;
+            }
+            let mut nodes = orch.nodes.lock().await;
+            for node in nodes.iter_mut() {
+                tokio::select! {
+                    event = node.swarm.next() => {
+                        if let Some(SwarmEvent::Behaviour(gossipsub::Event::Message { message, .. })) = event {
+                            let text = String::from_utf8_lossy(&message.data).to_string();
+                            if !received.contains(&text) {
+                                received.push(text);
+                            }
+                        }
+                    }
+                    _ = tokio::time::sleep(Duration::from_millis(10)) => {}
+                }
+                if received.len() >= messages.len() {
+                    break 'collect;
+                }
+            }
+            drop(nodes);
         }
-        drop(nodes);
 
         for &msg in &messages {
             let found = received.iter().any(|r| r.as_str() == msg);

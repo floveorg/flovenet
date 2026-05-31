@@ -101,11 +101,23 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     needs: [check]
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/master'
     steps:
       - uses: actions/checkout@v4
       - name: Build Docker image
         run: docker build -t flovenet:latest .
+
+  # P2P integration test (test_harness)
+  p2p-test:
+    runs-on: ubuntu-latest
+    needs: [check]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Build test_harness
+        run: cargo build -p test_harness --release
+      - name: Run P2P tests
+        run: ./target/release/flovenet-test --scenarios all
 
   # Security audit
   audit:

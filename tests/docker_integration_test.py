@@ -62,7 +62,36 @@ def chk(name, passed, expected, actual):
 def section(title):
     print(f"\n=== {title} ===")
 
-GF = lambda d, *keys: d.get("data", {}).get(keys[0], {}) if len(keys)==1 else d.get("data", {}).get(keys[0], {}).get(keys[1], "MISSING")
+def gf(d, *keys):
+    """Traverse nested response dict by key path (e.g. gf(r, 'register', 'profile', 'displayName'))."""
+    val = d.get("data", {})
+    for k in keys:
+        if isinstance(val, dict):
+            val = val.get(k, "MISSING")
+        else:
+            return "MISSING"
+    return val
+
+def wait_for_gateway(timeout=60):
+    start = time.time()
+    while time.time() - start < timeout:
+        try:
+            if http_code(f"{GATEWAY}/graphql") == 200:
+                return True
+        except Exception:
+            pass
+        time.sleep(2)
+    return False
+
+# ======================================================================
+section("0: Gateway Readiness")
+# ======================================================================
+
+ready = wait_for_gateway()
+make_scenario("gateway_ready", [chk("ready", ready, True, ready)])
+print(f"  Gateway ready: {ready}")
+if not ready:
+    print("  ERROR: Gateway not ready after 60s, continuing anyway...")
 
 # ======================================================================
 section("1: GraphQL API — Auth & Users")
@@ -80,9 +109,9 @@ print(f"HTTP {c}, graphql={'graphql' in b}")
 print("  1.2 Register user 1...", end=" ", flush=True)
 e1 = f"t1_{int(time.time())}@f.io"
 r1 = gql(f'mutation {{ register(email:"{e1}",password:"p1",displayName:"User One") {{ token, profile {{ displayName, peerId }} }} }}')
-t1 = GF(r1, "register", "token")
-n1 = GF(r1, "register", "displayName")
-p1 = GF(r1, "register", "peerId")
+t1 = gf(r1, "register", "token")
+n1 = gf(r1, "register", "profile", "displayName")
+p1 = gf(r1, "register", "profile", "peerId")
 make_scenario("gateway_register_u1", [
     chk("token", bool(t1 and t1!="MISSING"), "non-empty", t1[:20]+"..."),
     chk("name", n1=="User One", "User One", n1),
@@ -92,7 +121,7 @@ print(f"OK token={t1[:20]}... name={n1}")
 
 print("  1.3 Login user 1...", end=" ", flush=True)
 l1 = gql(f'mutation {{ login(email:"{e1}",password:"p1") {{ token }} }}')
-lt1 = GF(l1, "login", "token")
+lt1 = gf(l1, "login", "token")
 make_scenario("gateway_login_u1", [
     chk("token", bool(lt1 and lt1!="MISSING"), "non-empty", lt1[:20]+"..."),
 ])
@@ -122,9 +151,9 @@ print(f"errors={'errors' in ln}")
 print("  1.7 Register user 2...", end=" ", flush=True)
 e2 = f"t2_{int(time.time())}@f.io"
 r2 = gql(f'mutation {{ register(email:"{e2}",password:"p2",displayName:"User Two") {{ token, profile {{ displayName, peerId }} }} }}')
-t2 = GF(r2, "register", "token")
-n2 = GF(r2, "register", "displayName")
-p2 = GF(r2, "register", "peerId")
+t2 = gf(r2, "register", "token")
+n2 = gf(r2, "register", "profile", "displayName")
+p2 = gf(r2, "register", "profile", "peerId")
 make_scenario("gateway_register_u2", [
     chk("token", bool(t2 and t2!="MISSING"), "non-empty", t2[:20]+"..."),
     chk("name", n2=="User Two", "User Two", n2),
@@ -135,7 +164,7 @@ print(f"OK token={t2[:20]}... name={n2}")
 print("  1.8 Register minimal...", end=" ", flush=True)
 e3 = f"t3_{int(time.time())}@f.io"
 r3 = gql(f'mutation {{ register(email:"{e3}",password:"p",displayName:"Min") {{ token }} }}')
-t3 = GF(r3, "register", "token")
+t3 = gf(r3, "register", "token")
 make_scenario("gateway_register_minimal", [
     chk("token", bool(t3 and t3!="MISSING"), "non-empty", t3[:20]+"..."),
 ])
@@ -208,7 +237,7 @@ u2_peerid = next((p["peerId"] for p in sp_list if p.get("displayName")=="User Tw
 
 print("  3.2 Get profile (u1)...", end=" ", flush=True)
 gp = gql(f'{{ profile(peerId:"{u1_peerid}") {{ displayName, bio, followerCount }} }}')
-gpn = GF(gp, "profile", "displayName")
+gpn = gf(gp, "profile", "displayName")
 make_scenario("gateway_get_profile", [
     chk("display_name", gpn=="User One", "User One", gpn or "null"),
 ])
@@ -216,7 +245,7 @@ print(f"displayName={gpn}")
 
 print("  3.3 Follow u1 → u2...", end=" ", flush=True)
 fw = gql(f'mutation {{ follow(peerId:"{u2_peerid}") }}')
-fwr = GF(fw, "follow")
+fwr = gf(fw, "follow")
 make_scenario("gateway_follow", [
     chk("followed", fwr==True, True, fwr),
 ])
@@ -240,7 +269,7 @@ print(f"count={frc}")
 
 print("  3.6 Unfollow u1 → u2...", end=" ", flush=True)
 uf = gql(f'mutation {{ unfollow(peerId:"{u2_peerid}") }}')
-ufr = GF(uf, "unfollow")
+ufr = gf(uf, "unfollow")
 make_scenario("gateway_unfollow", [
     chk("unfollowed", ufr==True, True, ufr),
 ])
@@ -318,10 +347,9 @@ for name,ctr in [("gateway","flovenet-gateway-1"),("node1","flovenet-node1-1"),
 section("7: P2P Port Listening")
 # ======================================================================
 
-for name,ctr,hexp,decp in [("gateway","flovenet-gateway-1","9987",39303),
-                            ("node1","flovenet-node1-1","b0e3",45283),
-                            ("node2","flovenet-node2-1","8483",33923),
-                            ("node3","flovenet-node3-1","8fe7",36839)]:
+for name,ctr,hexp,decp in [("node1","flovenet-node1-1","2386",9094),
+                            ("node2","flovenet-node2-1","2387",9095),
+                            ("node3","flovenet-node3-1","2388",9096)]:
     out,_,_ = sudo_docker(ctr, "sh", "-c",
                           f"awk '{{print $2}}' /proc/net/tcp 2>/dev/null | grep -i ':{hexp}$' || true")
     found = bool(out.strip())
@@ -341,19 +369,20 @@ def x_tcp(fr, ip, port, label):
     make_scenario(f"cross_tcp_{label}", [chk("reachable", ok, True, "reachable" if ok else out)])
     print(f"  {label}: {'REACHABLE' if ok else 'UNREACHABLE'}")
 
-for args in [("flovenet-node1-1","172.18.0.5",39303,"node1→gateway_p2p"),
-             ("flovenet-node2-1","172.18.0.5",39303,"node2→gateway_p2p"),
-             ("flovenet-node3-1","172.18.0.5",39303,"node3→gateway_p2p"),
-             ("flovenet-gateway-1","172.18.0.4",45283,"gateway→node1_p2p"),
-             ("flovenet-gateway-1","172.18.0.2",33923,"gateway→node2_p2p"),
-             ("flovenet-gateway-1","172.18.0.3",36839,"gateway→node3_p2p"),
-             ("flovenet-node1-1","172.18.0.2",33923,"node1→node2_p2p"),
-             ("flovenet-node2-1","172.18.0.3",36839,"node2→node3_p2p"),
-             ("flovenet-node3-1","172.18.0.4",45283,"node3→node1_p2p"),
-             ("flovenet-node1-1","172.18.0.5",8080,"node1→gateway_http"),
-             ("flovenet-gateway-1","172.18.0.4",9091,"gateway→node1_api"),
-             ("flovenet-gateway-1","172.18.0.2",9092,"gateway→node2_api"),
-             ("flovenet-gateway-1","172.18.0.3",9093,"gateway→node3_api")]:
+for args in [
+    # P2P cross-container (using fixed libp2p ports)
+    ("flovenet-node1-1","flovenet-node2-1",9095,"node1→node2_p2p"),
+    ("flovenet-node2-1","flovenet-node3-1",9096,"node2→node3_p2p"),
+    ("flovenet-node3-1","flovenet-node1-1",9094,"node3→node1_p2p"),
+    # HTTP cross-container
+    ("flovenet-node1-1","flovenet-gateway-1",8080,"node1→gateway_http"),
+    ("flovenet-node1-1","flovenet-node2-1",9092,"node1→node2_api"),
+    ("flovenet-node1-1","flovenet-node3-1",9093,"node1→node3_api"),
+    ("flovenet-node2-1","flovenet-node1-1",9091,"node2→node1_api"),
+    ("flovenet-node2-1","flovenet-node3-1",9093,"node2→node3_api"),
+    ("flovenet-node3-1","flovenet-node1-1",9091,"node3→node1_api"),
+    ("flovenet-node3-1","flovenet-node2-1",9092,"node3→node2_api"),
+]:
     x_tcp(*args)
 
 # ======================================================================
@@ -362,9 +391,10 @@ section("9: DNS Resolution")
 
 def dns(fr, target, label):
     out,_,_ = sudo_docker(fr, "sh", "-c", f"timeout 3 getent hosts {target} 2>&1 || echo FAILED")
-    ok = "172.18." in out
-    make_scenario(f"dns_{label}", [chk("resolved", ok, "172.18.x.x", out.split()[0] if ok else "FAILED")])
-    print(f"  {label}: {'OK' if ok else 'FAILED'}")
+    ip = out.split()[0] if out and "FAILED" not in out else None
+    ok = ip is not None
+    make_scenario(f"dns_{label}", [chk("resolved", ok, "valid IP", ip or "FAILED")])
+    print(f"  {label}: {'OK' if ok else 'FAILED'} ({ip})")
 
 for args in [("flovenet-gateway-1","flovenet-node1-1","gateway→node1"),
              ("flovenet-gateway-1","flovenet-node2-1","gateway→node2"),

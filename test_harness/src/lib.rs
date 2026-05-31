@@ -113,7 +113,7 @@ pub struct TestNode {
 }
 
 impl TestNode {
-    pub fn new(port: u16) -> Self {
+    pub async fn new() -> Self {
         let key = identity::Keypair::generate_ed25519();
         let peer_id = PeerId::from(key.public());
 
@@ -134,6 +134,7 @@ impl TestNode {
             .heartbeat_interval(Duration::from_millis(500))
             .message_id_fn(msg_id_fn)
             .validation_mode(gossipsub::ValidationMode::Anonymous)
+            .flood_publish(true)
             .build()
             .unwrap();
 
@@ -143,16 +144,32 @@ impl TestNode {
             transport,
             behaviour,
             peer_id,
-            libp2p::swarm::Config::with_tokio_executor(),
+            libp2p::swarm::Config::with_tokio_executor()
+                .with_idle_connection_timeout(Duration::from_secs(30)),
         );
 
-        let addr: Multiaddr = format!("/ip4/127.0.0.1/tcp/{port}").parse().unwrap();
-        swarm.listen_on(addr.clone()).unwrap();
+        let addr: Multiaddr = "/ip4/127.0.0.1/tcp/0".parse().unwrap();
+        swarm.listen_on(addr).unwrap();
+
+        // Wait for the listen address to be assigned.
+        use futures::StreamExt;
+        let listen_addr = loop {
+            tokio::select! {
+                event = swarm.next() => {
+                    if let Some(SwarmEvent::NewListenAddr { address, .. }) = event {
+                        break address;
+                    }
+                }
+                _ = tokio::time::sleep(Duration::from_millis(500)) => {
+                    panic!("Timeout waiting for listen address");
+                }
+            }
+        };
 
         TestNode {
             peer_id,
             swarm,
-            listen_addr: addr,
+            listen_addr,
         }
     }
 
@@ -270,39 +287,97 @@ impl TestOrchestrator {
         self.nodes.lock().await.len()
     }
 
-    /// Connect all nodes into a mesh: each node dials every other node.
+    /// Connect all nodes into a mesh.
+    ///
+    /// Each node dials every node with a higher index (one direction), then
+    /// polls all swarms in rotation until every node has at least one mesh peer
+    /// on the given topic (or the 10s deadline expires).
     pub async fn connect_all(&self) -> Vec<TestCheck> {
         let mut checks = Vec::new();
-        let mut nodes = self.nodes.lock().await;
-        let n = nodes.len();
+        let n = {
+            let nodes = self.nodes.lock().await;
+            nodes.len()
+        };
         if n < 2 {
             return checks;
         }
 
-        // Dial
-        for i in 0..n {
-            for j in 0..n {
-                if i == j {
-                    continue;
+        // Dial one direction: node i → node j for i < j
+        {
+            let mut nodes = self.nodes.lock().await;
+            for i in 0..n {
+                for j in (i + 1)..n {
+                    let target = nodes[j]
+                        .listen_addr
+                        .clone()
+                        .with(Protocol::P2p(nodes[j].peer_id));
+                    if let Err(e) = nodes[i].swarm.dial(target) {
+                        tracing::warn!("dial node[{i}] → node[{j}] failed: {e:?}");
+                    }
                 }
-                let target = nodes[j]
-                    .listen_addr
-                    .clone()
-                    .with(Protocol::P2p(nodes[j].peer_id));
-                let _ = nodes[i].swarm.dial(target);
             }
         }
 
-        // Wait for gossip heartbeats to mesh
-        drop(nodes);
-        tokio::time::sleep(Duration::from_millis(1500)).await;
+        // Poll all swarms until every node has at least (n-1) connected peers.
+        use futures::StreamExt;
+        let deadline = Instant::now() + Duration::from_secs(15);
+        loop {
+            if Instant::now() > deadline {
+                break;
+            }
 
-        checks.push(TestCheck::new(
-            "mesh_dialed",
-            true,
-            format!("{n} nodes"),
-            format!("{n} nodes dialed"),
-        ));
+            let mut nodes = self.nodes.lock().await;
+
+            // Round-robin: poll each swarm -> drain one event or yield 5ms
+            for node in nodes.iter_mut() {
+                tokio::select! {
+                    event = node.swarm.next() => { drop(event); }
+                    _ = tokio::time::sleep(Duration::from_millis(5)) => {}
+                }
+            }
+
+            // Check every node has all other peers connected.
+            let need = n - 1;
+            let mut all_connected = true;
+            for node in nodes.iter() {
+                if node.swarm.behaviour().all_peers().count() < need {
+                    all_connected = false;
+                    break;
+                }
+            }
+            drop(nodes);
+
+            if all_connected {
+                break;
+            }
+        }
+
+        // Final connectivity check.
+        let nodes = self.nodes.lock().await;
+        let mut all_connected = true;
+        let need = n - 1;
+        for (i, node) in nodes.iter().enumerate() {
+            let count = node.swarm.behaviour().all_peers().count();
+            if count < need {
+                all_connected = false;
+                checks.push(TestCheck::new(
+                    &format!("node_{i}_not_all_connected"),
+                    false,
+                    format!("≥ {need} peers"),
+                    format!("{count} peers"),
+                ));
+            }
+        }
+        drop(nodes);
+
+        if all_connected {
+            checks.push(TestCheck::new(
+                "all_connected",
+                true,
+                format!("{n} nodes"),
+                format!("{n} nodes dialed"),
+            ));
+        }
         checks
     }
 }

@@ -1,31 +1,49 @@
 services:
   node1:
     image: flovenet:latest
-    command: daemon --port 0 --api-port 9091 --roles compute,storage
+    command: daemon --port 9094 --api-port 9091 --roles compute,storage
     ports:
       - "9091:9091"
+      - "9094:9094"
     environment:
       - RUST_LOG=info
+    healthcheck:
+      test: curl -f http://localhost:9091/health || exit 1
+      interval: 5s
+      retries: 10
+      start_period: 10s
     networks:
       - flovenet
 
   node2:
     image: flovenet:latest
-    command: daemon --port 0 --api-port 9092 --roles compute
+    command: daemon --port 9095 --api-port 9092 --roles compute
     ports:
       - "9092:9092"
+      - "9095:9095"
     environment:
       - RUST_LOG=info
+    healthcheck:
+      test: curl -f http://localhost:9092/health || exit 1
+      interval: 5s
+      retries: 10
+      start_period: 10s
     networks:
       - flovenet
 
   node3:
     image: flovenet:latest
-    command: daemon --port 0 --api-port 9093 --roles storage
+    command: daemon --port 9096 --api-port 9093 --roles storage
     ports:
       - "9093:9093"
+      - "9096:9096"
     environment:
       - RUST_LOG=info
+    healthcheck:
+      test: curl -f http://localhost:9093/health || exit 1
+      interval: 5s
+      retries: 10
+      start_period: 10s
     networks:
       - flovenet
 
@@ -36,6 +54,10 @@ services:
       - "8080:8080"
     environment:
       - RUST_LOG=info
+    depends_on:
+      node1: { condition: service_healthy }
+      node2: { condition: service_healthy }
+      node3: { condition: service_healthy }
     networks:
       - flovenet
 
