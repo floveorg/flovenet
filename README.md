@@ -97,6 +97,58 @@ cargo run --release -- run --manifest _start --image wasm_images/feed_ranker.was
 FLOVENET_GPU_VRAM_GB=24 FLOVENET_GPU_MODEL="RTX 4090" cargo run --release -- share --role ai
 ```
 
+## CI/CD
+
+Cada push desencadena el pipeline **CI** (fmt → clippy → build → test, audit, deny, dashboard, deb-package, cross-build).
+
+| Job | Descripción |
+|-----|------------|
+| check | fmt + clippy + build + test (ubuntu) |
+| cross-build | Build para `x86_64-unknown-linux-gnu` + `x86_64-pc-windows-msvc` |
+| dashboard | Build web (Vite) |
+| deb-package | Genera `.deb` |
+| docker | Build imagen Docker |
+| audit | `cargo audit` (advisories ignorados: libp2p, wasmtime) |
+| deny | `cargo deny` (licencias, bans, fuentes) |
+
+## Release
+
+Al pushear un tag `v*` se activa el workflow **Release** que compila para todas las plataformas y crea un GitHub Release con los binarios:
+
+| Plataforma | Archivo |
+|------------|---------|
+| Linux (amd64) | `flovenet_*.deb` |
+| Windows (x86_64) | `daemon.exe` |
+| macOS (Intel) | `daemon-x86_64-apple-darwin` |
+| macOS (Apple Silicon) | `daemon-aarch64-apple-darwin` |
+
+```bash
+# Crear y publicar un release
+git tag -a v0.2.0 -m "v0.2.0"
+git push origin v0.2.0
+```
+
+## Instalación
+
+### Debian/Ubuntu
+
+```bash
+# Desde un .deb
+sudo dpkg -i flovenet_0.2.0_amd64.deb
+
+# Servicios systemd disponibles:
+#   flovenet-daemon.service    (P2P en :9090)
+#   flovenet-gateway.service   (GraphQL en :8080)
+```
+
+### macOS / Windows
+
+Descargar el binario desde GitHub Releases y ejecutar:
+
+```bash
+./daemon daemon --port 0 --api-port 9090 --roles compute,storage
+```
+
 ## Docker
 
 ```bash
@@ -136,6 +188,14 @@ dd if=/dev/urandom bs=32 count=1 of=swarm.key
 cargo run -- daemon --swarm-key swarm.key
 ```
 
+## Tests
+
+```bash
+cargo test        # ~178 tests
+cargo clippy      # 0 warnings
+cargo fmt         # format
+```
+
 ## Fases de implementación
 
 | Fase | Estado |
@@ -151,11 +211,3 @@ cargo run -- daemon --swarm-key swarm.key
 | F8 Replicación + S3Backend + P2P Cache | ✅ |
 | F9 GPU Distribuida | 🔄 |
 | F10–F14 | ⬜ |
-
-## Tests
-
-```bash
-cargo test        # ~178 tests
-cargo clippy      # 0 warnings
-cargo fmt         # format
-```
