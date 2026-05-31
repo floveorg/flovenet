@@ -13,8 +13,6 @@ allow = [
     "Zlib",
     "OpenSSL",
 ]
-unlicensed = "allow"
-
 [bans]
 skip = [
     { name = "yamux", version = "0.12.1" },
