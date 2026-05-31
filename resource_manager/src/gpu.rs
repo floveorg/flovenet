@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+#[cfg(target_os = "linux")]
 use std::path::Path;
 
 /// A GPU slot with a specific VRAM allocation.
@@ -186,7 +187,7 @@ fn detect_gpu_platform() -> (Option<f64>, Option<String>) {
                         let parts: Vec<&str> = line.split(',').collect();
                         if parts.len() >= 3 {
                             let name = parts[2].trim().to_string();
-                            if let Ok(bytes) = parts.get(1).and_then(|s| s.trim().parse::<u64>()) {
+                            if let Some(Ok(bytes)) = parts.get(1).map(|s| s.trim().parse::<u64>()) {
                                 let vram_gb = bytes as f64 / 1024.0 / 1024.0 / 1024.0;
                                 if vram_gb > 0.0 {
                                     return (Some((vram_gb * 10.0).round() / 10.0), Some(name));
