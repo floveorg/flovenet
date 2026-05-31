@@ -28,7 +28,6 @@ pub fn load_swarm_key(path: Option<&str>) -> Option<[u8; 32]> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write;
 
     #[test]
     fn test_load_swarm_key_none() {
@@ -44,7 +43,7 @@ mod tests {
     fn test_load_swarm_key_too_short() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("short.key");
-        std::fs::write(&path, &[0u8; 16]).unwrap();
+        std::fs::write(&path, [0u8; 16]).unwrap();
         assert_eq!(load_swarm_key(Some(path.to_str().unwrap())), None);
     }
 
@@ -57,7 +56,7 @@ mod tests {
             0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c,
             0x1d, 0x1e, 0x1f, 0x20,
         ];
-        std::fs::write(&path, &key_bytes).unwrap();
+        std::fs::write(&path, key_bytes).unwrap();
         let loaded = load_swarm_key(Some(path.to_str().unwrap())).unwrap();
         assert_eq!(loaded, key_bytes);
     }
@@ -66,7 +65,7 @@ mod tests {
     fn test_load_swarm_key_truncates_extra() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("long.key");
-        let mut data = vec![0xabu8; 64];
+        let data = vec![0xabu8; 64];
         std::fs::write(&path, &data).unwrap();
         let loaded = load_swarm_key(Some(path.to_str().unwrap())).unwrap();
         assert_eq!(loaded.len(), 32);
@@ -142,7 +141,7 @@ mod tests {
     async fn test_p2p_gossip_message_exchange() {
         let mut swarm_a = build_test_swarm();
         let (mut swarm_b, peer_b) = {
-            let mut b = build_test_swarm();
+            let b = build_test_swarm();
             let pid = *b.local_peer_id();
             (b, pid)
         };
