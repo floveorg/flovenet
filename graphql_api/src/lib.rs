@@ -480,7 +480,7 @@ mod tests {
         let cid1 = p1.cid.clone();
         store.save_post(&cid1, p1.clone()).await;
 
-        let mut p2 = make_post("b", "second");
+        let p2 = make_post("b", "second");
         let cid2 = p2.cid.clone();
         store.save_post(&cid2, p2.clone()).await;
 
@@ -879,7 +879,7 @@ mod tests {
             .await
             .unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        assert!(json["data"]["feed"].as_array().unwrap().len() >= 1);
+        assert!(!json["data"]["feed"].as_array().unwrap().is_empty());
     }
 
     #[tokio::test]
@@ -929,7 +929,7 @@ mod tests {
             .await
             .unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        assert!(json["errors"].as_array().unwrap().len() >= 1);
+        assert!(!json["errors"].as_array().unwrap().is_empty());
     }
 
     #[tokio::test]
