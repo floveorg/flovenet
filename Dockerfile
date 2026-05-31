@@ -4,7 +4,7 @@
 #   docker build --platform linux/amd64,linux/arm64 -t flovenet:latest .
 
 # Stage 1: Build the Rust binary
-FROM rust:1.85-slim-bookworm AS chef
+FROM rust:slim-bookworm AS chef
 RUN apt-get update && apt-get install -y pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
 RUN cargo install cargo-chef
 WORKDIR /app
