@@ -13,7 +13,7 @@ allow = [
     "Zlib",
     "OpenSSL",
 ]
-unlicensed = "allow"
+unlicensed-policy = "allow"
 
 [advisories]
 ignore = [
