@@ -1,0 +1,5 @@
+[advisories]
+ignore = [
+    "RUSTSEC-2026-0119",  # hickory-proto CPU exhaustion (libp2p transitive dep, no fix available yet)
+    "RUSTSEC-2024-0437",  # protobuf crash (prometheus transitive dep, blocked on prometheus upgrade)
+]
