@@ -249,6 +249,12 @@ pub struct TestOrchestrator {
     pub nodes: Arc<Mutex<Vec<TestNode>>>,
 }
 
+impl Default for TestOrchestrator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TestOrchestrator {
     pub fn new() -> Self {
         Self {
@@ -294,8 +300,8 @@ impl TestOrchestrator {
         checks.push(TestCheck::new(
             "mesh_dialed",
             true,
-            &format!("{n} nodes"),
-            &format!("{n} nodes dialed"),
+            format!("{n} nodes"),
+            format!("{n} nodes dialed"),
         ));
         checks
     }
