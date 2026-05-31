@@ -1,5 +1,15 @@
 [advisories]
 ignore = [
-    "RUSTSEC-2026-0119",  # hickory-proto CPU exhaustion (libp2p transitive dep, no fix available yet)
-    "RUSTSEC-2024-0437",  # protobuf crash (prometheus transitive dep, blocked on prometheus upgrade)
+    "RUSTSEC-2026-0119",  # hickory-proto CPU exhaustion (libp2p transitive, no upgrade available)
+    "RUSTSEC-2024-0437",  # protobuf crash in prometheus (transitive, blocked on prometheus)
+    "RUSTSEC-2025-0009",  # ring AES panic (libp2p-tls transitive via libp2p)
+    "RUSTSEC-2026-0099",  # rustls-webpki name constraints (libp2p-tls transitive)
+    "RUSTSEC-2026-0098",  # rustls-webpki URI names (libp2p-tls transitive)
+    "RUSTSEC-2026-0104",  # rustls-webpki panic in CRL parsing (libp2p-tls transitive)
+    "RUSTSEC-2026-0086",  # wasmtime host data leakage 64-bit tables (low severity)
+    "RUSTSEC-2026-0089",  # wasmtime host panic table.fill (medium severity)
+    "RUSTSEC-2026-0094",  # wasmtime table.grow return value masking (medium severity)
+    "RUSTSEC-2026-0095",  # wasmtime sandbox escape Winch (critical, transitiva)
+    "RUSTSEC-2026-0096",  # wasmtime sandbox escape aarch64 (critical, transitiva)
+    "RUSTSEC-2026-0088",  # wasmtime pooling allocator data leakage (low severity)
 ]
