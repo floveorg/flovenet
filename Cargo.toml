@@ -46,6 +46,7 @@ futures = "0.3"
 uuid = { version = "1", features = ["v4"] }
 multihash = "0.19"
 sha2 = "0.10"
+rust-embed = "8"
 hex = "0.4"
 wasmtime = "24"
 wasmtime-wasi = "24"

@@ -1,15 +1,24 @@
 mod networking;
 
 use std::net::SocketAddr;
-use std::sync::LazyLock;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, LazyLock};
 
-use axum::{routing::get, Router};
+use axum::{
+    extract::State,
+    http::{header, StatusCode},
+    response::IntoResponse,
+    routing::{get, post},
+    Json, Router,
+};
 use clap::Parser;
 use cli::{Cli, Commands};
 use prometheus::{register_int_counter, Encoder, IntCounter, TextEncoder};
 use reputation_engine::{EventKind, ReputationEvent};
 use resource_manager::{NodeDescriptor, NodeResources, NodeRole};
+use rust_embed::Embed;
 use scheduler::LocalScheduler;
+use serde::{Deserialize, Serialize};
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::EnvFilter;
 use vm_runtime::{wasmtime_runner::WasmtimeRunner, Manifest, Runner};
@@ -17,6 +26,31 @@ use vm_runtime::{wasmtime_runner::WasmtimeRunner, Manifest, Runner};
 static HTTP_REQUESTS: LazyLock<IntCounter> = LazyLock::new(|| {
     register_int_counter!("flovenet_http_requests_total", "Total HTTP requests").unwrap()
 });
+
+#[derive(Embed)]
+#[folder = "web/"]
+struct Asset;
+
+#[derive(Clone)]
+struct AppState {
+    peer_id: Arc<String>,
+    roles: Vec<NodeRole>,
+    resources: NodeResources,
+    sharing: Arc<AtomicBool>,
+}
+
+#[derive(Serialize)]
+struct StatusResponse {
+    peer_id: String,
+    roles: Vec<String>,
+    sharing: bool,
+    resources: NodeResources,
+}
+
+#[derive(Deserialize)]
+struct ShareRequest {
+    enabled: bool,
+}
 
 fn init_tracing() {
     tracing_subscriber::fmt()
@@ -35,17 +69,75 @@ async fn metrics_handler() -> String {
     String::from_utf8(buffer).unwrap_or_default()
 }
 
-fn build_router() -> Router {
+async fn status_handler(State(state): State<AppState>) -> Json<StatusResponse> {
+    Json(StatusResponse {
+        peer_id: (*state.peer_id).clone(),
+        roles: state.roles.iter().map(|r| r.as_str().to_string()).collect(),
+        sharing: state.sharing.load(Ordering::Relaxed),
+        resources: state.resources.clone(),
+    })
+}
+
+async fn share_handler(
+    State(state): State<AppState>,
+    Json(req): Json<ShareRequest>,
+) -> Json<StatusResponse> {
+    state.sharing.store(req.enabled, Ordering::Relaxed);
+    Json(StatusResponse {
+        peer_id: (*state.peer_id).clone(),
+        roles: state.roles.iter().map(|r| r.as_str().to_string()).collect(),
+        sharing: state.sharing.load(Ordering::Relaxed),
+        resources: state.resources.clone(),
+    })
+}
+
+async fn static_handler(path: axum::extract::Path<String>) -> impl IntoResponse {
+    let path = path.0;
+    let filename = if path.is_empty() || path == "/" {
+        "index.html"
+    } else {
+        &path
+    };
+    match Asset::get(filename) {
+        Some(file) => {
+            let mime = match filename.rsplit('.').next().unwrap_or("") {
+                "html" => "text/html; charset=utf-8",
+                "css" => "text/css; charset=utf-8",
+                "js" => "application/javascript; charset=utf-8",
+                "svg" => "image/svg+xml",
+                "png" => "image/png",
+                "ico" => "image/x-icon",
+                _ => "application/octet-stream",
+            };
+            (
+                StatusCode::OK,
+                [(header::CONTENT_TYPE, mime)],
+                file.data.to_vec(),
+            )
+        }
+        None => (
+            StatusCode::NOT_FOUND,
+            [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+            b"404 not found"[..].into(),
+        ),
+    }
+}
+
+fn build_router(state: AppState) -> Router {
     Router::new()
         .route("/metrics", get(metrics_handler))
         .route("/health", get(|| async { "ok" }))
+        .route("/api/status", get(status_handler))
+        .route("/api/share", post(share_handler))
+        .route("/{*path}", get(static_handler))
+        .with_state(state)
         .layer(CorsLayer::permissive())
 }
 
-async fn run_metrics_server(port: u16) -> anyhow::Result<()> {
-    let app = build_router();
+async fn run_metrics_server(port: u16, state: AppState) -> anyhow::Result<()> {
+    let app = build_router(state);
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
-    tracing::info!("Metrics/API endpoint: http://{addr}");
+    tracing::info!("Web dashboard: http://{addr}");
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
     Ok(())
@@ -74,6 +166,7 @@ async fn run_daemon(
         .map(|r| NodeDescriptor::slots_for_role(r, &resources))
         .max()
         .unwrap_or(1);
+    let resources_for_state = resources.clone();
     let local_descriptor = NodeDescriptor {
         peer_id: String::new(),
         roles,
@@ -100,6 +193,7 @@ async fn run_daemon(
 
     let rep_arc = network.reputation.clone();
     let peer_id_for_handler = peer_id.to_string();
+    let descriptor_for_handler = local_descriptor.clone();
 
     network
         .set_job_handler(move |offer: market_protocol::JobOffer| {
@@ -119,7 +213,7 @@ async fn run_daemon(
             };
 
             match scheduler.can_accept(
-                &local_descriptor,
+                &descriptor_for_handler,
                 &requirement,
                 &resource_manager::NodeRole::Compute,
             ) {
@@ -176,7 +270,13 @@ async fn run_daemon(
         .await;
 
     // Metrics server in background
-    let metrics_handle = tokio::spawn(async move { run_metrics_server(api_port).await });
+    let state = AppState {
+        peer_id: Arc::new(peer_id.to_string()),
+        roles: local_descriptor.roles.clone(),
+        resources: resources_for_state,
+        sharing: Arc::new(AtomicBool::new(false)),
+    };
+    let metrics_handle = tokio::spawn(async move { run_metrics_server(api_port, state).await });
 
     // Run network event loop
     tokio::select! {

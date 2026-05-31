@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flovenet Node</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Flovenet</h1>
+      <p class="subtitle">Node Dashboard</p>
+    </header>
+
+    <section id="status">
+      <div class="card" id="peer-card">
+        <span class="label">Peer ID</span>
+        <span class="value mono" id="peer-id">—</span>
+      </div>
+      <div class="card" id="roles-card">
+        <span class="label">Roles</span>
+        <span class="value" id="roles">—</span>
+      </div>
+      <div class="card" id="sharing-card">
+        <span class="label">Sharing</span>
+        <span class="value" id="sharing-status">—</span>
+      </div>
+    </section>
+
+    <section id="resources">
+      <h2>Resources</h2>
+      <div class="grid">
+        <div class="card">
+          <span class="label">CPU Cores</span>
+          <span class="value large" id="cpu">—</span>
+        </div>
+        <div class="card">
+          <span class="label">RAM</span>
+          <span class="value large" id="ram">—</span>
+        </div>
+        <div class="card">
+          <span class="label">Disk</span>
+          <span class="value large" id="disk">—</span>
+        </div>
+        <div class="card">
+          <span class="label">GPU</span>
+          <span class="value large" id="gpu">—</span>
+        </div>
+        <div class="card">
+          <span class="label">Uptime</span>
+          <span class="value large" id="uptime">—</span>
+        </div>
+        <div class="card">
+          <span class="label">Platform</span>
+          <span class="value large" id="platform">—</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="actions">
+      <h2>Actions</h2>
+      <button id="share-btn" class="btn">Enable Sharing</button>
+    </section>
+
+    <section id="error" class="hidden">
+      <p class="error-msg">Could not reach node API. Is the daemon running?</p>
+    </section>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
