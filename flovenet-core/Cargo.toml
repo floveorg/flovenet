@@ -2,6 +2,7 @@
 name = "flovenet-core"
 version = "0.1.0"
 edition = "2021"
+license = "MIT OR Apache-2.0"
 description = "Core library for Flovenet P2P compute network - used by desktop and mobile clients"
 
 [lib]

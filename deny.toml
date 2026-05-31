@@ -12,6 +12,7 @@ allow = [
     "Unlicense",
     "Zlib",
     "OpenSSL",
+    "Apache-2.0 WITH LLVM-exception",
 ]
 [bans]
 skip = [
