@@ -13,20 +13,24 @@ allow = [
     "Zlib",
     "OpenSSL",
 ]
+unlicensed = "allow"
 
+[bans]
+skip = [
+    { name = "yamux", version = "0.12.1" },
+]
 
 [advisories]
 ignore = [
     "RUSTSEC-2026-0119",
     "RUSTSEC-2024-0437",
-    "RUSTSEC-2025-0009",
-    "RUSTSEC-2026-0099",
-    "RUSTSEC-2026-0098",
-    "RUSTSEC-2026-0104",
+    "RUSTSEC-2024-0384",
+    "RUSTSEC-2024-0436",
+    "RUSTSEC-2025-0057",
     "RUSTSEC-2026-0086",
+    "RUSTSEC-2026-0088",
     "RUSTSEC-2026-0089",
     "RUSTSEC-2026-0094",
     "RUSTSEC-2026-0095",
     "RUSTSEC-2026-0096",
-    "RUSTSEC-2026-0088",
 ]
